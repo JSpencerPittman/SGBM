@@ -12,5 +12,7 @@ enable_language(CUDA)
 
 project(SGBM VERSION 1.0)
 
-add_executable(${PROJECT_NAME} src/main.cpp)
+add_executable(${PROJECT_NAME} src/main.cpp src/kernel.cu)
 add_executable("${PROJECT_NAME}_CUDA" src/hello_world.cu)
+
+target_include_directories(${PROJECT_NAME} PRIVATE include)

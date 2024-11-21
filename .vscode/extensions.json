@@ -2,6 +2,7 @@
     "recommendations": [
         // C/C++
         "ms-vscode.cpptools",
+        "ms-vscode.cpptools-extension-pack",
         // CMake
         "ms-vscode.cmake-tools",
         // CUDA
