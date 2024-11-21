@@ -3,6 +3,8 @@
         // C/C++
         "ms-vscode.cpptools",
         // CMake
-        "ms-vscode.cmake-tools"
+        "ms-vscode.cmake-tools",
+        // CUDA
+        "nvidia.nsight-vscode-edition"
     ]
 }
