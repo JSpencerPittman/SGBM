@@ -1,0 +1,8 @@
+{
+    "recommendations": [
+        // C/C++
+        "ms-vscode.cpptools",
+        // CMake
+        "ms-vscode.cmake-tools"
+    ]
+}
