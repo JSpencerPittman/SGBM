@@ -1,5 +1,2 @@
 # Build artifacts
 build
-
-# VSCode device-specific configurations
-.vscode/c_cpp_properties.json

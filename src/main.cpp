@@ -1,10 +1,15 @@
 #include <iostream>
 
-#include "kernel.cuh"
+#define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+
+#include "image.h"
 
 int main() {
-    std::cout << "Host: Starting" << std::endl;
-    hello_world();
-    std::cout << "Host: Terminating" << std::endl;
+    std::filesystem::path inPath = "../data/koala.jpg";
+    Image koalaGray(inPath, true);
+    koalaGray.writePng("koala_gray.png");
+    Image koalaRGB(inPath);
+    koalaRGB.writePng("koala_rgb.png");
     return 0;
 }
