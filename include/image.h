@@ -5,16 +5,17 @@
 #include <string>
 #include <filesystem>
 
-#define STB_IMAGE_IMPLEMENTATION
 #include <stb/stb_image.h>
+#include <stb/stb_image_write.h>
+
+namespace fs = std::filesystem;
 
 class Image
 {
 public:
-    Image(const std::filesystem::path& path, bool grayscale = false);
+    Image(const fs::path& path, bool grayscale = false);
 
-private:
-    static bool isValidFilePath(const std::filesystem::path &path, std::string &errorMessage);
+    void writePng(const fs::path& path) const;
 
 private:
     std::unique_ptr<stbi_uc[], void (*)(stbi_uc[])> m_data;
