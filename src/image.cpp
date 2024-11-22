@@ -1,8 +1,6 @@
 #include "image.h"
 
 #include <stdexcept>
-#include <filesystem>
-#include <string>
 #include <util/format.hpp>
 
 // #define STB_IMAGE_WRITE_IMPLEMENTATION

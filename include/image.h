@@ -3,6 +3,7 @@
 
 #include <stddef.h>
 #include <string>
+#include <filesystem>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb/stb_image.h>
@@ -13,7 +14,7 @@ public:
     Image(const std::filesystem::path& path, bool grayscale = false);
 
 private:
-    static bool isValidFilePath(const std::filesystem::path &path, std::string &errorMessage) noexcept;
+    static bool isValidFilePath(const std::filesystem::path &path, std::string &errorMessage);
 
 private:
     std::unique_ptr<stbi_uc[], void (*)(stbi_uc[])> m_data;
