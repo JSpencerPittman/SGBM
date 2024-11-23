@@ -1,16 +1,30 @@
 #include <iostream>
+#include <stdio.h>
 
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 
 #include "image.h"
-#include "sgbm.cuh"
+#include "csct.cuh"
 
 int main() {
     std::filesystem::path inPath = "../data/koala.jpg";
-    Image koalaGray(inPath, true);
+    Image image(inPath, true);
 
-    sgbm(koalaGray);
+    CSCTResults res = csct(image);
+
+    std::cout << "IMAGESIZE:" << image.width() << " x " << image.height() << std::endl;
+
+    for(size_t idx = 0; idx < image.width(); ++idx) {
+        for(size_t idx2 = 0; idx2 < 4; ++idx2)
+            std::cout << static_cast<int>(res.first[idx*4 + idx2]);
+        std::cout << " ";
+    }
+    std::cout << std::endl;
+
+    delete [] res.first;
+
+    printf("It has been done.\n");
 
     return 0;
 }
