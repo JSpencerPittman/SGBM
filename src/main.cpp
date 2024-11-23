@@ -17,12 +17,12 @@ int main() {
 
     for(size_t idx = 0; idx < image.width(); ++idx) {
         for(size_t idx2 = 0; idx2 < 4; ++idx2)
-            std::cout << static_cast<int>(res.first[idx*4 + idx2]);
+            std::cout << static_cast<int>(res.data[idx*4 + idx2]);
         std::cout << " ";
     }
     std::cout << std::endl;
 
-    delete [] res.first;
+    delete [] res.data;
 
     printf("It has been done.\n");
 

@@ -56,15 +56,19 @@ __global__ void csctKernel(Byte* image, bool* results, size_t width, size_t heig
         censusTransform(imageBlock, results, imageIndex);
 };
 
+size_t comparisonsPerPixel(size_t width, size_t height) {
+    size_t diameter = 2 * RADIUS + 1;
+    return ((diameter * (diameter + 1)) / 2) - 2;
+}
+
 CSCTResults allocateCSCTResultArray(size_t width, size_t height) {
     bool* csctResDev;
     size_t numPixels = width * height;
-    size_t diameter = 2 * RADIUS + 1;
-    size_t comparisonsPerPixel = ((diameter * (diameter + 1)) / 2) - 2;
-    size_t totalComparisons = comparisonsPerPixel * numPixels;
+    size_t compPerPix = comparisonsPerPixel(width, height);
+    size_t totalComparisons = compPerPix * numPixels;
     size_t numBytes = totalComparisons * sizeof(bool);
     cudaMalloc(&csctResDev, numBytes);
-    return std::make_pair(csctResDev, numBytes);
+    return {csctResDev, numPixels, compPerPix};
 }
 
 Byte* copyImageToDevice(Image& image) {
@@ -75,9 +79,10 @@ Byte* copyImageToDevice(Image& image) {
 }
 
 CSCTResults copyResultsToHost(CSCTResults resultsDev) {
-    size_t resultsSize = resultsDev.second;
-    CSCTResults resultsHost(new bool[resultsDev.second], resultsSize);
-    cudaMemcpy(resultsHost.first, resultsDev.first, resultsSize, cudaMemcpyDeviceToHost);
+    CSCTResults resultsHost(new bool[resultsDev.numBytes],
+                            resultsDev.numPixels,
+                            resultsDev.compPerPix);
+    cudaMemcpy(resultsHost.data, resultsDev.data, resultsDev.numBytes, cudaMemcpyDeviceToHost);
     return resultsHost;
 }
 
@@ -96,12 +101,12 @@ CSCTResults csct(Image& image) {
         ceil(static_cast<float>(width) / tileSize));
     dim3 numBlocks(blocksHorz, blocksVert);
 
-    csctKernel<<<numBlocks, threadsPerBlock>>>(imageDev, resultsDev.first, width, height);
+    csctKernel<<<numBlocks, threadsPerBlock>>>(imageDev, resultsDev.data, width, height);
         
     CSCTResults resultsHost = copyResultsToHost(resultsDev);
 
     cudaFree(imageDev);
-    cudaFree(resultsDev.first);
+    cudaFree(resultsDev.data);
 
     return resultsHost;
 }
