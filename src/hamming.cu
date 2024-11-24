@@ -6,7 +6,7 @@ __device__ uint32_t calcDistance(bool *bitSeq1, bool *bitSeq2, size_t seqLen)
 {
     uint32_t distance = 0;
     for (size_t idx = 0; idx < seqLen; ++idx)
-        if (bitSeq1[idx] == bitSeq2[2])
+        if (bitSeq1[idx] == bitSeq2[idx])
             distance++;
     return distance;
 }
@@ -14,20 +14,21 @@ __device__ uint32_t calcDistance(bool *bitSeq1, bool *bitSeq2, size_t seqLen)
 __global__ void hammingKernel(bool *leftCSCT, bool *rightCSCT, uint32_t *distances,
                               size_t width, size_t height, size_t compPerPixel)
 {  
-    bool log = blockIdx.x == 0 && blockIdx.y == 0;
-
     size_t croppedWidth = width - MAX_DISPARITY;
     size_t yCoord = blockIdx.y * blockDim.y + threadIdx.y;
     size_t xCoordCrop = blockIdx.x * blockDim.x + threadIdx.x;
-    size_t xCoordLeft = xCoordCrop + MAX_DISPARITY;
+    size_t xCoordLeftImage = xCoordCrop + MAX_DISPARITY;
 
     if(xCoordCrop >= croppedWidth) return;
 
-    bool* leftPixel = leftCSCT + compPerPixel * (yCoord * width + xCoordLeft);
+    size_t imageIndexLeft = yCoord * width + xCoordLeftImage;
+    size_t distancesIndex = yCoord * croppedWidth + xCoordCrop * (MAX_DISPARITY+1);
+    bool* leftPixel = leftCSCT + compPerPixel * imageIndexLeft;
 
     for(size_t disparity = 0; disparity <= MAX_DISPARITY; ++disparity) {
-        bool* rightPixel = rightCSCT + compPerPixel * (yCoord * width + xCoordLeft - disparity);
-        distances[yCoord * croppedWidth + xCoordCrop + disparity] = calcDistance(leftPixel, rightPixel, compPerPixel);
+        size_t imageIndexInRight = imageIndexLeft - disparity;
+        bool* rightPixel = rightCSCT + compPerPixel * imageIndexInRight;
+        distances[distancesIndex + disparity] = calcDistance(leftPixel, rightPixel, compPerPixel);
     }
 }
 
@@ -69,8 +70,6 @@ HamDistances hamming(CSCTResults leftCSCT, CSCTResults rightCSCT, size_t width, 
     size_t blocksHorz = static_cast<size_t>(
         ceil((static_cast<float>(width) - MAX_DISPARITY) / BLOCK_SIZE));
     dim3 numBlocks(blocksHorz, blocksVert);
-    printf("IMAGE_SIZE: %lu, %lu\n", width, height);
-    printf("BLOCK_COUNTS: %lu, %lu\n", blocksHorz, blocksVert);
 
     HamDistances distancesDev = allocateHamDistancesArray(width, height);
 

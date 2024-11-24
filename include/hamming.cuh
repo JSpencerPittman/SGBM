@@ -5,7 +5,7 @@
 
 #include "csct.cuh"
 
-#define MAX_DISPARITY 10
+#define MAX_DISPARITY 1
 
 struct HamDistances
 {
