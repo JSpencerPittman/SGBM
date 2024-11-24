@@ -22,13 +22,14 @@ __global__ void hammingKernel(bool *leftCSCT, bool *rightCSCT, uint32_t *distanc
     if(xCoordCrop >= croppedWidth) return;
 
     size_t imageIndexLeft = yCoord * width + xCoordLeftImage;
-    size_t distancesIndex = yCoord * croppedWidth + xCoordCrop * (MAX_DISPARITY+1);
+    size_t pixelIdx = yCoord * croppedWidth + xCoordCrop;
+    size_t distancesIdx = pixelIdx * (MAX_DISPARITY + 1);
     bool* leftPixel = leftCSCT + compPerPixel * imageIndexLeft;
 
     for(size_t disparity = 0; disparity <= MAX_DISPARITY; ++disparity) {
         size_t imageIndexInRight = imageIndexLeft - disparity;
         bool* rightPixel = rightCSCT + compPerPixel * imageIndexInRight;
-        distances[distancesIndex + disparity] = calcDistance(leftPixel, rightPixel, compPerPixel);
+        distances[distancesIdx + disparity] = calcDistance(leftPixel, rightPixel, compPerPixel);
     }
 }
 
