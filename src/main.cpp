@@ -6,23 +6,26 @@
 
 #include "image.h"
 #include "csct.cuh"
+#include "hamming.cuh"
 
 int main() {
     std::filesystem::path inPath = "../data/koala.jpg";
     Image image(inPath, true);
 
-    CSCTResults res = csct(image);
+    CSCTResults leftRes = csct(image);
+    CSCTResults rightRes = csct(image);
 
-    std::cout << "IMAGESIZE:" << image.width() << " x " << image.height() << std::endl;
+    printf("Part 1 complete\n");
 
-    for(size_t idx = 0; idx < image.width(); ++idx) {
-        for(size_t idx2 = 0; idx2 < 4; ++idx2)
-            std::cout << static_cast<int>(res.data[idx*4 + idx2]);
-        std::cout << " ";
+    HamDistances hams = hamming(leftRes, rightRes, image.width(), image.height());
+    
+    for(size_t idx = 0; idx < 1000; ++idx) {
+        std::cout << hams.data[idx] << " ";
     }
-    std::cout << std::endl;
 
-    delete [] res.data;
+    delete [] leftRes.data;
+    delete [] rightRes.data;
+    delete [] hams.data;
 
     printf("It has been done.\n");
 
