@@ -6,7 +6,7 @@ __device__ uint32_t calcDistance(bool *bitSeq1, bool *bitSeq2, size_t seqLen)
 {
     uint32_t distance = 0;
     for (size_t idx = 0; idx < seqLen; ++idx)
-        if (bitSeq1[idx] == bitSeq2[idx])
+        if (bitSeq1[idx] != bitSeq2[idx])
             distance++;
     return distance;
 }

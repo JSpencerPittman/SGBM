@@ -1,5 +1,6 @@
 #include <iostream>
 #include <stdio.h>
+#include <filesystem>
 
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
@@ -7,27 +8,92 @@
 #include "image.h"
 #include "csct.cuh"
 #include "hamming.cuh"
+#include "directional.cuh"
 
 int main() {
-    std::filesystem::path inPath = "../data/koala.jpg";
-    Image image(inPath, true);
+    // Load Images
+    std::filesystem::path leftImagePath = "../data/left.png";
+    std::filesystem::path rightImagePath = "../data/right.png";
 
-    CSCTResults leftRes = csct(image);
-    CSCTResults rightRes = csct(image);
+    Image leftImage(leftImagePath, true);
+    Image rightImage(rightImagePath, true);
 
-    printf("Part 1 complete\n");
+    // Save Grayscale images
+    std::filesystem::path leftImageGraySavePath = "../data/left_gray.png";
+    std::filesystem::path rightImageGraySavePath = "../data/right_gray.png";
+    leftImage.writePng(leftImageGraySavePath);
+    rightImage.writePng(rightImageGraySavePath);
 
-    HamDistances hams = hamming(leftRes, rightRes, image.width(), image.height());
+    size_t imageWidth = leftImage.width();
+    size_t imageHeight = rightImage.height();
     
-    for(size_t idx = 0; idx < 1000; ++idx) {
-        std::cout << hams.data[idx] << " ";
+    /* ROI - Original */
+    printf("ROI - Original\nROI");
+    for(size_t col = 64; col <= 69; ++col) {
+            printf("%5lu ", col);
     }
+    printf("\n\n");
+    for(size_t row = 97; row <= 101; ++row) {
+        printf("%3lu", row);
+        for(size_t col = 64; col <= 69; ++col) {
+            printf("%5d ", leftImage.data()[row * imageWidth + col]);
+        }
+        printf("\n");
+    }
+    /* -------------- */
 
-    delete [] leftRes.data;
-    delete [] rightRes.data;
+    // Center-Symmetric Census Transform
+    CSCTResults leftCSCTRes = csct(leftImage);
+    CSCTResults rightCSCTRes = csct(rightImage);
+
+    /* ROI - CSCT */
+    printf("\nROI - CSCT\nROI");
+    for(size_t col = 64; col <= 69; ++col) {
+            printf("%15lu", col);
+    }
+    printf("\n\n");
+    for(size_t row = 97; row <= 101; ++row) {
+        printf("%3lu", row);
+        for(size_t col = 64; col <= 69; ++col) {
+            printf("  ");
+            for(size_t comp = 0; comp < leftCSCTRes.compPerPix; ++comp) {
+                size_t compIdx = (row * imageWidth + col) * leftCSCTRes.compPerPix + comp;
+                printf("%d", leftCSCTRes.data[compIdx]);
+            }
+            printf(" ");
+        }
+        printf("\n");
+    }
+    /* -------------- */
+
+    printf("Completed Census Transforms!\n");
+
+    HamDistances hams = hamming(leftCSCTRes, rightCSCTRes, imageWidth, imageHeight);
+
+    delete [] leftCSCTRes.data;
+    delete [] rightCSCTRes.data;
+
+    printf("Completed Hamming Distance Calculations!\n");
+
+    size_t croppedImageWidth = hams.numPixels / imageHeight;
+    uint8_t* disparityMap = directionalLoss(hams, croppedImageWidth, imageHeight);
+
+    printf("\nCropped Width: %lu\n", croppedImageWidth);
+    // for(size_t idx = 0; idx < croppedImageWidth * (hams.maxDisparity+1); ++idx) {
+    //     printf("%u ", hams.data[idx]);
+    // }
+
     delete [] hams.data;
 
-    printf("It has been done.\n");
+    printf("Finished Estimating Disparity Map!\n");
+
+    std::filesystem::path outPath("disparity.png");
+    stbi_write_png(outPath.c_str(), croppedImageWidth, imageHeight, 1, disparityMap, croppedImageWidth);
+    // for(size_t idx = 0; idx < croppedImageWidth; ++idx) {
+    //     printf("%u ", disparityMap[idx]);
+    // }
+
+    delete [] disparityMap;
 
     return 0;
 }

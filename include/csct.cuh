@@ -5,8 +5,8 @@
 
 #include "image.h"
 
-#define BLOCK_SIZE 16
-#define RADIUS 1
+#define BLOCK_SIZE 32
+#define RADIUS 2
 
 struct CSCTResults
 {
