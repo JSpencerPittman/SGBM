@@ -44,6 +44,6 @@ void Image::writePng(const fs::path& path) const {
     stbi_write_png(path.c_str(), m_width, m_height, m_channels, m_data.get(), m_width * m_channels);
 }
 
-size_t Image::size() const {
+size_t Image::numBytes() const {
     return m_width * m_height * m_channels * sizeof(Byte);
 }

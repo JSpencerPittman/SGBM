@@ -9,6 +9,7 @@
 #include "csct.cuh"
 #include "hamming.cuh"
 #include "directional.cuh"
+#include "tensor.cuh"
 
 int main() {
     // Load Images
@@ -43,8 +44,12 @@ int main() {
     /* -------------- */
 
     // Center-Symmetric Census Transform
-    CSCTResults leftCSCTRes = csct(leftImage);
-    CSCTResults rightCSCTRes = csct(rightImage);
+    TensorDims imageDims(leftImage.height(), leftImage.width(), leftImage.channels());
+    FlatImage leftImageF(imageDims, leftImage.data());
+    FlatImage rightImageF(imageDims, rightImage.data());
+
+    CSCTResults leftCSCTRes = csct(leftImageF);
+    CSCTResults rightCSCTRes = csct(rightImageF);
 
     /* ROI - CSCT */
     // printf("\nROI - CSCT\nROI");

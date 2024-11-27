@@ -1,9 +1,9 @@
 #include "csct.cuh"
 #include "util/format.hpp"
 
-__device__ size_t indexInImage(size_t width, size_t height)
+__device__ TensorCoord coordInImage(FlatImage& image)
 {
-    size_t tileSize = BLOCK_SIZE - (2 * RADIUS );
+    int tileSize = BLOCK_SIZE - (2 * RADIUS );
     int xCoordInImg = (blockIdx.x * tileSize) - RADIUS + threadIdx.x;
     int yCoordInImg = (blockIdx.y * tileSize) - RADIUS + threadIdx.y;
 
@@ -11,16 +11,10 @@ __device__ size_t indexInImage(size_t width, size_t height)
     If a coordinate lays outside of the image's bounds then the closest pixel is used for that value.
     This allows us to have a radius around the selected tile even for pixels on the edges of the image.
     */
-    size_t xCoordClampedInImg = min(static_cast<size_t>(max(0, xCoordInImg)), width - 1);
-    size_t yCoordClampedInImg = min(static_cast<size_t>(max(0, yCoordInImg)), height - 1);
+    int xCoordClampedInImg = min(max(0, xCoordInImg), (int)image.dims.cols - 1);
+    int yCoordClampedInImg = min(max(0, yCoordInImg), (int)image.dims.rows - 1);
 
-    return yCoordClampedInImg * width + xCoordClampedInImg;
-}
-
-__device__ void saveImageBlockToSharedMemory(Byte *image, Byte imageBlock[], size_t imageIndex)
-{
-    size_t blockIdx = blockDim.x * threadIdx.y + threadIdx.x;
-    imageBlock[blockIdx] = image[imageIndex];
+    return {static_cast<size_t>(yCoordClampedInImg), static_cast<size_t>(xCoordClampedInImg)};
 }
 
 __device__ bool insideHalo()
@@ -32,100 +26,68 @@ __device__ bool insideHalo()
     return true;
 }
 
-__device__ void censusTransform(Byte *imageBlock, bool *results, size_t imageIndex)
+__device__ void censusTransform(FlatImage& imageBlock, CSCTResults& results, TensorCoord coordImage)
 {
-    size_t diameter = 2 * RADIUS + 1;
-    size_t compPerPixel = diameter * RADIUS + RADIUS;
-
     size_t compIdx = 0;
     int radiusInt = static_cast<int>(RADIUS);
     for(int diffX = -radiusInt; diffX < 0; ++diffX) {
         for(int diffY = -radiusInt; diffY <= radiusInt; ++diffY) {
-            int diffIdx = (threadIdx.y + diffY) * blockDim.x + (threadIdx.x + diffX);
-            int oppIdx = (threadIdx.y - diffY) *  blockDim.x + (threadIdx.x - diffX);
-
-            results[(compPerPixel * imageIndex) + compIdx] = imageBlock[diffIdx] >= imageBlock[oppIdx];
+            results(coordImage.row, coordImage.col, compIdx) = 
+                imageBlock(threadIdx.y + diffY, threadIdx.x + diffX) >=
+                imageBlock(threadIdx.y - diffY, threadIdx.x - diffX);
             ++compIdx;
         }
     }
     for(int diffY = -radiusInt; diffY < 0; ++diffY) {
-        int diffIdx = (threadIdx.y + diffY) * blockDim.x + threadIdx.x;
-        int oppIdx = (threadIdx.y - diffY) * blockDim.x + threadIdx.x;
-
-        results[(compPerPixel * imageIndex) + compIdx] = imageBlock[diffIdx] >= imageBlock[oppIdx];
+        results(coordImage.row, coordImage.col, compIdx) = 
+                imageBlock(threadIdx.y + diffY, threadIdx.x) >=
+                imageBlock(threadIdx.y - diffY, threadIdx.x);
         ++compIdx;
     }
 }
 
-__global__ void csctKernel(Byte *image, bool *results, size_t width, size_t height)
+__global__ void csctKernel(FlatImage image, CSCTResults results)
 {
-    __shared__ Byte imageBlock[BLOCK_SIZE * BLOCK_SIZE];
+    __shared__ Byte imageBlockData[BLOCK_SIZE * BLOCK_SIZE];
+    FlatImage imageBlock({BLOCK_SIZE, BLOCK_SIZE, 1}, (Byte*)&imageBlockData);
 
-    size_t imageIndex = indexInImage(width, height);
-    saveImageBlockToSharedMemory(image, imageBlock, imageIndex);
+    TensorCoord coordImage = coordInImage(image);
+    imageBlock(threadIdx.y, threadIdx.x) = image(coordImage);
     __syncthreads();
 
     if (insideHalo())
-        censusTransform(imageBlock, results, imageIndex);
+        censusTransform(imageBlock, results, coordImage);
 };
 
-size_t comparisonsPerPixel(size_t width, size_t height)
-{
+CSCTResults allocateCSCTResultArray(FlatImage& image) {
     size_t diameter = 2 * RADIUS + 1;
-    return diameter * RADIUS + RADIUS;
+    size_t compPerPix = diameter * RADIUS + RADIUS;
+    TensorDims csctResShape(image.dims.rows, image.dims.cols, compPerPix);
+    CSCTResults resultsDev(csctResShape, true);
+    return resultsDev;
 }
 
-CSCTResults allocateCSCTResultArray(size_t width, size_t height)
+CSCTResults csct(FlatImage &image)
 {
-    bool *csctResDev;
-    size_t numPixels = width * height;
-    size_t compPerPix = comparisonsPerPixel(width, height);
-    size_t totalComparisons = compPerPix * numPixels;
-    size_t numBytes = totalComparisons * sizeof(bool);
-    cudaMalloc(&csctResDev, numBytes);
-    return {csctResDev, numPixels, compPerPix};
-}
-
-Byte *copyImageToDevice(Image &image)
-{
-    Byte *imageDev;
-    cudaMalloc(&imageDev, image.size());
-    cudaMemcpy(imageDev, image.data(), image.size(), cudaMemcpyHostToDevice);
-    return imageDev;
-}
-
-CSCTResults copyResultsToHost(CSCTResults resultsDev)
-{
-    CSCTResults resultsHost(new bool[resultsDev.numBytes],
-                            resultsDev.numPixels,
-                            resultsDev.compPerPix);
-    cudaMemcpy(resultsHost.data, resultsDev.data, resultsDev.numBytes, cudaMemcpyDeviceToHost);
-    return resultsHost;
-}
-
-CSCTResults csct(Image &image)
-{
-    size_t width = image.width(), height = image.height(), imageSize = image.size();
-
     // Load images onto GPU
-    Byte *imageDev = copyImageToDevice(image);
-    CSCTResults resultsDev = allocateCSCTResultArray(image.width(), image.height());
+    FlatImage imageDev = image.copyToDevice();
+    CSCTResults resultsDev = allocateCSCTResultArray(image);
 
     dim3 threadsPerBlock(BLOCK_SIZE, BLOCK_SIZE);
     float tileSize = static_cast<float>(BLOCK_SIZE) - (2 * static_cast<float>(RADIUS));
     size_t blocksVert = static_cast<size_t>(
-        ceil(static_cast<float>(height) / tileSize));
+        ceil(static_cast<float>(image.dims.rows) / tileSize));
     size_t blocksHorz = static_cast<size_t>(
-        ceil(static_cast<float>(width) / tileSize));
+        ceil(static_cast<float>(image.dims.cols) / tileSize));
     dim3 numBlocks(blocksHorz, blocksVert);
 
-    csctKernel<<<numBlocks, threadsPerBlock>>>(imageDev, resultsDev.data, width, height);
+    csctKernel<<<numBlocks, threadsPerBlock>>>(imageDev, resultsDev);
     cudaDeviceSynchronize();
 
-    CSCTResults resultsHost = copyResultsToHost(resultsDev);
+    CSCTResults resultsHost = resultsDev.copyToHost();
 
-    cudaFree(imageDev);
-    cudaFree(resultsDev.data);
+    imageDev.free();
+    resultsDev.free();
 
     return resultsHost;
 }

@@ -18,7 +18,6 @@ __global__ void hammingKernel(bool *leftCSCT, bool *rightCSCT, uint32_t *distanc
     size_t yCoord = blockIdx.y * blockDim.y + threadIdx.y;
     size_t xCoordCrop = blockIdx.x * blockDim.x + threadIdx.x;
     size_t xCoordLeftImage = xCoordCrop + MAX_DISPARITY;
-    bool log = yCoord == height && xCoordCrop == 0;
 
     if(yCoord >= height || xCoordCrop >= croppedWidth) return;
 
@@ -35,9 +34,9 @@ __global__ void hammingKernel(bool *leftCSCT, bool *rightCSCT, uint32_t *distanc
 
 CSCTResults copyResultsToDevice(CSCTResults resultsHost)
 {
-    CSCTResults resultsDev(nullptr, resultsHost.numPixels, resultsHost.compPerPix);
-    cudaMalloc(&resultsDev.data, resultsDev.numBytes);
-    cudaMemcpy(resultsDev.data, resultsHost.data, resultsHost.numBytes, cudaMemcpyHostToDevice);
+    CSCTResults resultsDev(resultsHost.dims, nullptr);
+    cudaMalloc(&resultsDev.data, resultsDev.bytes());
+    cudaMemcpy(resultsDev.data, resultsHost.data, resultsHost.bytes(), cudaMemcpyHostToDevice);
     return resultsDev;
 }
 
@@ -74,7 +73,7 @@ HamDistances hamming(CSCTResults leftCSCT, CSCTResults rightCSCT, size_t width, 
 
     HamDistances distancesDev = allocateHamDistancesArray(width, height);
 
-    hammingKernel<<<numBlocks, threadsPerBlock>>>(leftCSCTDev.data, rightCSCTDev.data, distancesDev.data, width, height, leftCSCTDev.compPerPix);
+    hammingKernel<<<numBlocks, threadsPerBlock>>>(leftCSCTDev.data, rightCSCTDev.data, distancesDev.data, width, height, leftCSCTDev.dims.channels);
     cudaDeviceSynchronize();
 
     HamDistances distancesHost = copyDistancesToHost(distancesDev);
