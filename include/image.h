@@ -20,7 +20,7 @@ public:
 
     void writePng(const fs::path &path) const;
 
-    size_t size() const;
+    size_t numBytes() const;
 
     /* -- Getters -- */
     Byte* data() { return m_data.get(); }
