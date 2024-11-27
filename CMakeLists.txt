@@ -13,7 +13,7 @@ enable_language(CUDA)
 project(SGBM VERSION 1.0)
 
 SET(SOURCE_CXX_FILES src/main.cpp src/image.cpp)
-SET(SOURCE_CUDA_FILES src/csct.cu src/hamming.cu)
+SET(SOURCE_CUDA_FILES src/csct.cu src/hamming.cu src/directional.cu)
 
 add_executable(${PROJECT_NAME} ${SOURCE_CXX_FILES} ${SOURCE_CUDA_FILES})
 

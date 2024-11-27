@@ -69,13 +69,6 @@ namespace Direction {
     }
 };
 
-namespace DisparityArray {
-    __device__ size_t pixelLocation(ImgCoord imgCoord, size_t width) {
-        size_t pixelIndex = imgCoord.y * width + imgCoord.x;
-        return pixelIndex * (MAX_DISPARITY + 1);
-    }
-};
-
 __device__ float minLossAtPixel(float* pixelLoss) {
     float minLoss = pixelLoss[0];
     for(size_t disparity = 1; disparity <= MAX_DISPARITY; ++disparity)
@@ -100,115 +93,117 @@ __device__ void addDirLossToAggregateLoss(float* dirLoss, float* aggLoss) {
         aggLoss[disparity] += dirLoss[disparity];
 } 
 
-__global__ void directionalLossKernel(Direction::Direction direction, uint32_t* distances, float* aggLoss, float* dirLoss, size_t width, size_t height, size_t maxSpan) {
+__global__ void directionalLossKernel(Direction::Direction direction,
+                                      Distances distances,
+                                      Loss aggLoss,
+                                      Loss dirLoss,
+                                      size_t maxSpan) {
+    size_t width = distances.dims.cols;
+    size_t height = distances.dims.rows;
+
     size_t gridIdx = blockIdx.x * blockDim.x + threadIdx.x;
     if(gridIdx >= maxSpan) return;
 
+    bool toggle = false;
+    float* prevDirLoss = dirLoss.colPtr(gridIdx, toggle);
+    float* currDirLoss = dirLoss.colPtr(gridIdx, !toggle);
+
     ImgCoord pixCoord = Direction::start(direction, threadIdx.x, width, height);
     // Locations within the disparity arrays
-    size_t pixLoc = DisparityArray::pixelLocation(pixCoord, width);
-    uint32_t* pixDist = distances + pixLoc;
-    float* pixDirLoss = dirLoss + pixLoc;
-    float* pixAggLoss = aggLoss + pixLoc;
+    float* pixAggLoss = aggLoss.colPtr(pixCoord.y, pixCoord.x);
 
     // Initial row is equal to the hamming distances
-    for(size_t disparity = 0; disparity <= MAX_DISPARITY+1; ++disparity) {
-        pixDirLoss[disparity] = pixDist[disparity];
-    }
-    addDirLossToAggregateLoss(pixDirLoss, pixAggLoss);
+    for(size_t disparity = 0; disparity <= MAX_DISPARITY+1; ++disparity)
+        prevDirLoss[disparity] = distances(pixCoord.y, pixCoord.x, disparity);
+    addDirLossToAggregateLoss(prevDirLoss, pixAggLoss);
 
-    float* prevPixDirLoss = pixDirLoss;
     pixCoord = Direction::next(direction, pixCoord);
 
     while(Direction::inImage(pixCoord, width, height)) {
-        pixLoc = DisparityArray::pixelLocation(pixCoord, width);
-        pixDist = distances + pixLoc;
-        pixDirLoss = dirLoss + pixLoc;
-        pixAggLoss = aggLoss + pixLoc;
+        pixAggLoss = aggLoss.colPtr(pixCoord.y, pixCoord.x);
 
-        calcLossesAtPixel(prevPixDirLoss, pixDirLoss, pixDist);
-        addDirLossToAggregateLoss(pixDirLoss, pixAggLoss);
+        calcLossesAtPixel(prevDirLoss, currDirLoss, distances.colPtr(pixCoord.y, pixCoord.x));
+        addDirLossToAggregateLoss(currDirLoss, pixAggLoss);
 
-        prevPixDirLoss = pixDirLoss;
+        toggle = !toggle;
+        prevDirLoss = dirLoss.colPtr(gridIdx, toggle);
+        currDirLoss = dirLoss.colPtr(gridIdx, !toggle);
         pixCoord = Direction::next(direction, pixCoord);
     }
 }
 
-__global__ void disparityMapKernel(uint8_t* dispMap, float* loss, size_t width, size_t height) {
+__global__ void disparityMapKernel(FlatImage dispMap, Loss loss, size_t width, size_t height) {
     ImgCoord pixCoord(blockIdx.x * blockDim.x + threadIdx.x,
                       blockIdx.y * blockDim.y + threadIdx.y);
 
     if(pixCoord.x >= width || pixCoord.y >= height) return;
 
-    size_t pixLocInLoss = DisparityArray::pixelLocation(pixCoord, width);    
-    loss = loss +  pixLocInLoss;
     size_t minDisparity = 0;
-    float minLoss = loss[0];
+    float minLoss = loss(pixCoord.y, pixCoord.x, 0);
     for(size_t disparity = 1; disparity <= MAX_DISPARITY; ++disparity) {
-        if(loss[disparity] < minLoss) {
-            minLoss = loss[disparity];
+        if(loss(pixCoord.y, pixCoord.x, disparity) < minLoss) {
+            minLoss = loss(pixCoord.y, pixCoord.x, disparity);
             minDisparity = disparity;
         }
     }
-    size_t imageIdx = pixCoord.y * static_cast<int>(width) + pixCoord.x;
-    dispMap[imageIdx] = static_cast<uint8_t>(minDisparity);
+
+    dispMap(pixCoord.y, pixCoord.x) = static_cast<Byte>(minDisparity);
 }
 
-float* allocateLoss(size_t width, size_t height) {
-    size_t numBytes = width * height * (MAX_DISPARITY + 1) * sizeof(float);
-    float* lossDev;
-    cudaMalloc(&lossDev, numBytes);
-    cudaMemset(lossDev, 0, numBytes);
+Loss allocateAggregateLoss(size_t width, size_t height) {
+    TensorDims lossDims(height, width, MAX_DISPARITY+1);
+    Loss lossDev(lossDims, true);
+    cudaMemset(lossDev.data, 0, lossDev.bytes());
     return lossDev;
 }
 
-uint8_t* allocateDisparityMap(size_t width, size_t height) {
-    size_t numBytes = width * height * sizeof(uint8_t);
-    uint8_t* dispMapDev;
-    cudaMalloc(&dispMapDev, numBytes);
+Loss allocateDirectionalLoss(size_t maxSpan) {
+    TensorDims lossDims(maxSpan, 2, MAX_DISPARITY+1);
+    Loss lossDev(lossDims, true);
+    return lossDev;
+}
+
+
+FlatImage allocateDisparityMap(size_t width, size_t height) {
+    TensorDims dispMapDims(height, width, 1);
+    FlatImage dispMapDev(dispMapDims, true);
     return dispMapDev;
 }
 
-void clearLoss(float* lossDev, size_t width, size_t height) {
-    size_t numBytes = width * height * (MAX_DISPARITY + 1) * sizeof(float);
-    cudaMemset(lossDev, 0, numBytes);
+void clearLoss(Loss& lossDev) {
+    cudaMemset(lossDev.data, 0, lossDev.bytes());
 }
 
-void lossInDirection(Direction::Direction direction, uint32_t* distances, float* aggLoss, float* dirLoss, size_t width, size_t height) {
+void lossInDirection(Direction::Direction direction, Distances& distances, Loss& aggLoss) {
     size_t numThreads = BLOCK_SIZE * BLOCK_SIZE;
     dim3 threadsPerBlock(numThreads);
 
-    size_t maxSpan = Direction::maxSpan(direction, width, height);
+    size_t maxSpan = Direction::maxSpan(direction, distances.dims.cols, distances.dims.rows);
     dim3 numBlocks(ceil(static_cast<float>(maxSpan) / BLOCK_SIZE));
 
-    directionalLossKernel<<<numBlocks, threadsPerBlock>>>(direction, distances, aggLoss, dirLoss, width, height, maxSpan);
+    Loss dirLoss = allocateDirectionalLoss(maxSpan);
+
+    directionalLossKernel<<<numBlocks, threadsPerBlock>>>(direction, distances, aggLoss, dirLoss, maxSpan);
+
+    dirLoss.free();
 }
 
-uint8_t* copyDisparityArrayToHost(uint8_t* dispArrDev, size_t width, size_t height) {
-    size_t numPixels = width * height;
-    uint8_t* dispArrHost = new uint8_t[numPixels];
-    cudaMemcpy(dispArrHost, dispArrDev, numPixels * sizeof(uint8_t), cudaMemcpyDeviceToHost);
-    return dispArrHost;
-}
+FlatImage directionalLoss(Distances& distancesHost) {
+    size_t width = distancesHost.dims.cols;
+    size_t height = distancesHost.dims.rows;
 
-
-uint8_t* directionalLoss(Distances& distancesHost, size_t width, size_t height) {
     // distances: row x col x disparity
-    // uint32_t* distancesDev = copyDistancesToDev(distancesHost);
-    uint32_t* distancesDev = distancesHost.copyToDevice().data;
+    Distances distancesDev = distancesHost.copyToDevice();
     // losses: row * col * disparity
-    float* aggLossesDev = allocateLoss(width, height);
-    float* dirLossesDev = allocateLoss(width, height);
+    Loss aggLossesDev = allocateAggregateLoss(width, height);
 
     for (int direction = Direction::LeftToRight; direction <= Direction::RightToLeft; ++direction) {
-        lossInDirection((Direction::Direction)direction, distancesDev, aggLossesDev, dirLossesDev, width, height);
-        clearLoss(dirLossesDev, width, height);
+        lossInDirection((Direction::Direction)direction, distancesDev, aggLossesDev);
     }
 
-    cudaFree(distancesDev);
-    cudaFree(dirLossesDev);
+    distancesDev.free();
 
-    uint8_t* dispMapDev = allocateDisparityMap(width, height);
+    FlatImage dispMapDev = allocateDisparityMap(width, height);
     
     dim3 threadsPerBlock(BLOCK_SIZE, BLOCK_SIZE);
     size_t blocksVert = static_cast<size_t>(
@@ -219,9 +214,10 @@ uint8_t* directionalLoss(Distances& distancesHost, size_t width, size_t height) 
 
     disparityMapKernel<<<numBlocks, threadsPerBlock>>>(dispMapDev, aggLossesDev, width, height);
     cudaDeviceSynchronize();
-    cudaFree(aggLossesDev);
+    aggLossesDev.free();
 
-    uint8_t* dispArrHost = copyDisparityArrayToHost(dispMapDev, width, height);
+    FlatImage dispMapHost = dispMapDev.copyToHost();
+
     // Synchronize and check for errors
     cudaError_t err = cudaGetLastError();
     if (err != cudaSuccess) {
@@ -229,7 +225,7 @@ uint8_t* directionalLoss(Distances& distancesHost, size_t width, size_t height) 
     }
     cudaDeviceSynchronize();
 
-    cudaFree(dispMapDev);
+    dispMapDev.free();
 
-    return dispArrHost;
+    return dispMapHost;
 }

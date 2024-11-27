@@ -81,7 +81,7 @@ int main() {
     printf("Completed Hamming Distance Calculations!\n");
 
     // size_t croppedImageWidth = hams.numPixels / imageHeight;
-    uint8_t* disparityMap = directionalLoss(hams, hams.dims.cols, imageHeight);
+    FlatImage disparityMap = directionalLoss(hams);
 
     /* ROI - Disparity Map */
     // printf("\nROI - Disparity Map\nROI");
@@ -99,14 +99,14 @@ int main() {
     /* -------------- */
 
 
-    delete [] hams.data;
+    hams.free();
 
     printf("Finished Estimating Disparity Map!\n");
 
     std::filesystem::path outPath("disparity.png");
-    stbi_write_png(outPath.c_str(), hams.dims.cols, imageHeight, 1, disparityMap, hams.dims.cols);
+    stbi_write_png(outPath.c_str(), hams.dims.cols, imageHeight, 1, disparityMap.data, hams.dims.cols);
 
-    delete [] disparityMap;
+    disparityMap.free();
 
     return 0;
 }

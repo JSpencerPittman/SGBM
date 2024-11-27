@@ -9,6 +9,8 @@
 #define P1 7
 #define P2 17
 
-uint8_t* directionalLoss(Distances& distancesHost, size_t width, size_t height);
+typedef Tensor<float> Loss;
+
+FlatImage directionalLoss(Distances& distancesHost);
 
 #endif
