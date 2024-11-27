@@ -1,7 +1,5 @@
 #include "hamming.cuh"
 
-#include <stdio.h>
-
 __device__ uint32_t calcDistance(bool *bitSeq1, bool *bitSeq2, size_t seqLen)
 {
     uint32_t distance = 0;
@@ -11,57 +9,40 @@ __device__ uint32_t calcDistance(bool *bitSeq1, bool *bitSeq2, size_t seqLen)
     return distance;
 }
 
-__global__ void hammingKernel(bool *leftCSCT, bool *rightCSCT, uint32_t *distances,
-                              size_t width, size_t height, size_t compPerPixel)
-{  
+__global__ void hammingKernel(CSCTResults leftCSCT, CSCTResults rightCSCT, Distances distances)
+{
+    size_t width = leftCSCT.dims.cols;
+    size_t height = leftCSCT.dims.rows;
+    size_t compPerPixel = leftCSCT.dims.channels;
+
+    TensorCoord coordCrop(blockIdx.y * blockDim.y + threadIdx.y,
+                          blockIdx.x * blockDim.x + threadIdx.x);
     size_t croppedWidth = width - MAX_DISPARITY;
-    size_t yCoord = blockIdx.y * blockDim.y + threadIdx.y;
-    size_t xCoordCrop = blockIdx.x * blockDim.x + threadIdx.x;
-    size_t xCoordLeftImage = xCoordCrop + MAX_DISPARITY;
 
-    if(yCoord >= height || xCoordCrop >= croppedWidth) return;
+    if(coordCrop.col >= croppedWidth || coordCrop.row >= height) return;
 
-    size_t imageIndexLeft = yCoord * width + xCoordLeftImage;  
-    size_t pixelIdx = yCoord * croppedWidth + xCoordCrop;
-    size_t distancesIdx = pixelIdx * (MAX_DISPARITY + 1);
-    bool* leftPixel = leftCSCT + compPerPixel * imageIndexLeft;
+    TensorCoord coordLeftImage(coordCrop.row, coordCrop.col + MAX_DISPARITY);
     for(size_t disparity = 0; disparity <= MAX_DISPARITY; ++disparity) {
-        size_t imageIndexInRight = imageIndexLeft - disparity;
-        bool* rightPixel = rightCSCT + compPerPixel * imageIndexInRight;
-        distances[distancesIdx + disparity] = calcDistance(leftPixel, rightPixel, compPerPixel);
+        TensorCoord coordRightImage(coordLeftImage.row, coordLeftImage.col - disparity);
+        distances(coordCrop.row, coordCrop.col, disparity) = 
+            calcDistance(leftCSCT.colPtr(coordLeftImage),
+                         rightCSCT.colPtr(coordRightImage),
+                         compPerPixel);
     }
 }
 
-CSCTResults copyResultsToDevice(CSCTResults resultsHost)
+Distances allocateDistancesArray(size_t width, size_t height)
 {
-    CSCTResults resultsDev(resultsHost.dims, nullptr);
-    cudaMalloc(&resultsDev.data, resultsDev.bytes());
-    cudaMemcpy(resultsDev.data, resultsHost.data, resultsHost.bytes(), cudaMemcpyHostToDevice);
-    return resultsDev;
+    TensorDims distShape (height, width - MAX_DISPARITY, MAX_DISPARITY+1);
+    return {distShape, true};
 }
 
-HamDistances allocateHamDistancesArray(size_t width, size_t height)
+Distances hamming(CSCTResults& leftCSCT, CSCTResults& rightCSCT)
 {
-    uint32_t *distancesDev;
-    size_t numPixels = (width - MAX_DISPARITY) * height;
-    size_t numBytes = numPixels * (MAX_DISPARITY+1) * sizeof(uint32_t);
-    cudaMalloc(&distancesDev, numBytes);
-    return {distancesDev, numPixels, MAX_DISPARITY};
-}
-
-HamDistances copyDistancesToHost(HamDistances distancesDev) {
-    HamDistances distancesHost(new uint32_t[distancesDev.numBytes],
-                               distancesDev.numPixels,
-                               distancesDev.maxDisparity);
-    cudaMemcpy(distancesHost.data, distancesDev.data, distancesDev.numBytes, cudaMemcpyDeviceToHost);
-    return distancesHost;
-}
-
-
-HamDistances hamming(CSCTResults leftCSCT, CSCTResults rightCSCT, size_t width, size_t height)
-{
-    CSCTResults leftCSCTDev = copyResultsToDevice(leftCSCT);
-    CSCTResults rightCSCTDev = copyResultsToDevice(rightCSCT);
+    size_t width = leftCSCT.dims.cols;
+    size_t height = leftCSCT.dims.rows;
+    CSCTResults leftCSCTDev = leftCSCT.copyToDevice();
+    CSCTResults rightCSCTDev = rightCSCT.copyToDevice();
 
     dim3 threadsPerBlock(BLOCK_SIZE, BLOCK_SIZE);
 
@@ -71,16 +52,16 @@ HamDistances hamming(CSCTResults leftCSCT, CSCTResults rightCSCT, size_t width, 
         ceil((static_cast<float>(width) - MAX_DISPARITY) / BLOCK_SIZE));
     dim3 numBlocks(blocksHorz, blocksVert);
 
-    HamDistances distancesDev = allocateHamDistancesArray(width, height);
+    Distances distancesDev = allocateDistancesArray(width, height);
 
-    hammingKernel<<<numBlocks, threadsPerBlock>>>(leftCSCTDev.data, rightCSCTDev.data, distancesDev.data, width, height, leftCSCTDev.dims.channels);
+    hammingKernel<<<numBlocks, threadsPerBlock>>>(leftCSCTDev, rightCSCTDev, distancesDev);
     cudaDeviceSynchronize();
 
-    HamDistances distancesHost = copyDistancesToHost(distancesDev);
+    Distances distancesHost = distancesDev.copyToHost();
 
-    cudaFree(leftCSCTDev.data);
-    cudaFree(rightCSCTDev.data);
-    cudaFree(distancesDev.data);
+    leftCSCTDev.free();
+    rightCSCTDev.free();
+    distancesDev.free();
 
     return distancesHost;
 }

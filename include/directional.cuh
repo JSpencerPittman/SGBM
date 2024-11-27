@@ -9,6 +9,6 @@
 #define P1 7
 #define P2 17
 
-uint8_t* directionalLoss(HamDistances& distancesHost, size_t width, size_t height);
+uint8_t* directionalLoss(Distances& distancesHost, size_t width, size_t height);
 
 #endif

@@ -73,15 +73,15 @@ int main() {
 
     printf("Completed Census Transforms!\n");
 
-    HamDistances hams = hamming(leftCSCTRes, rightCSCTRes, imageWidth, imageHeight);
+    Distances hams = hamming(leftCSCTRes, rightCSCTRes);
 
-    delete [] leftCSCTRes.data;
-    delete [] rightCSCTRes.data;
+    leftCSCTRes.free();
+    rightCSCTRes.free();
 
     printf("Completed Hamming Distance Calculations!\n");
 
-    size_t croppedImageWidth = hams.numPixels / imageHeight;
-    uint8_t* disparityMap = directionalLoss(hams, croppedImageWidth, imageHeight);
+    // size_t croppedImageWidth = hams.numPixels / imageHeight;
+    uint8_t* disparityMap = directionalLoss(hams, hams.dims.cols, imageHeight);
 
     /* ROI - Disparity Map */
     // printf("\nROI - Disparity Map\nROI");
@@ -104,7 +104,7 @@ int main() {
     printf("Finished Estimating Disparity Map!\n");
 
     std::filesystem::path outPath("disparity.png");
-    stbi_write_png(outPath.c_str(), croppedImageWidth, imageHeight, 1, disparityMap, croppedImageWidth);
+    stbi_write_png(outPath.c_str(), hams.dims.cols, imageHeight, 1, disparityMap, hams.dims.cols);
 
     delete [] disparityMap;
 

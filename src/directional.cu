@@ -1,6 +1,5 @@
 #include "directional.cuh"
 
-#include <stdio.h>
 
 struct ImgCoord {
     __host__ __device__ ImgCoord(int x, int y): x(x), y(y) {}
@@ -175,13 +174,6 @@ void clearLoss(float* lossDev, size_t width, size_t height) {
     cudaMemset(lossDev, 0, numBytes);
 }
 
-uint32_t* copyDistancesToDev(HamDistances& distancesHost) {
-    uint32_t* distancesDev;
-    cudaMalloc(&distancesDev, distancesHost.numBytes);
-    cudaMemcpy(distancesDev, distancesHost.data, distancesHost.numBytes, cudaMemcpyHostToDevice);
-    return distancesDev;
-}
-
 void lossInDirection(Direction::Direction direction, uint32_t* distances, float* aggLoss, float* dirLoss, size_t width, size_t height) {
     size_t numThreads = BLOCK_SIZE * BLOCK_SIZE;
     dim3 threadsPerBlock(numThreads);
@@ -200,9 +192,10 @@ uint8_t* copyDisparityArrayToHost(uint8_t* dispArrDev, size_t width, size_t heig
 }
 
 
-uint8_t* directionalLoss(HamDistances& distancesHost, size_t width, size_t height) {
+uint8_t* directionalLoss(Distances& distancesHost, size_t width, size_t height) {
     // distances: row x col x disparity
-    uint32_t* distancesDev = copyDistancesToDev(distancesHost);
+    // uint32_t* distancesDev = copyDistancesToDev(distancesHost);
+    uint32_t* distancesDev = distancesHost.copyToDevice().data;
     // losses: row * col * disparity
     float* aggLossesDev = allocateLoss(width, height);
     float* dirLossesDev = allocateLoss(width, height);
