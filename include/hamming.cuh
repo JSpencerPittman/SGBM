@@ -5,11 +5,11 @@
 
 #include "csct.cuh"
 
-#define MAX_DISPARITY 64
+#define MAX_DISPARITY 200
 
 struct HamDistances
 {
-    HamDistances(uint32_t *data, size_t numPixels, size_t maxDisparity) : data(data), numPixels(numPixels), maxDisparity(maxDisparity), numBytes(numPixels * (maxDisparity+1) + sizeof(uint32_t)) {}
+    HamDistances(uint32_t *data, size_t numPixels, size_t maxDisparity) : data(data), numPixels(numPixels), maxDisparity(maxDisparity), numBytes(numPixels * (maxDisparity+1) * sizeof(uint32_t)) {}
 
     uint32_t *pixel(size_t pixelIdx)
     {

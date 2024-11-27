@@ -6,8 +6,8 @@
 
 #include "hamming.cuh"
 
-#define P1 0.3
-#define P2 0.4
+#define P1 7
+#define P2 17
 
 uint8_t* directionalLoss(HamDistances& distancesHost, size_t width, size_t height);
 

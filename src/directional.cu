@@ -1,25 +1,66 @@
 #include "directional.cuh"
 
+#include <stdio.h>
+
 struct ImgCoord {
     __host__ __device__ ImgCoord(int x, int y): x(x), y(y) {}
     int x, y;
 };
 
 namespace Direction {
-    __device__ ImgCoord start(size_t idx, size_t width, size_t height) {
-        return {0, static_cast<int>(idx)};
+    enum Direction {LeftToRight, TopLeftToBotRight, TopToBot, TopRightToBotLeft, RightToLeft};
+
+    __device__ ImgCoord start(Direction direction, size_t idx, size_t width, size_t height) {
+        switch (direction) {
+            case LeftToRight:
+                return {0, static_cast<int>(idx)};
+            case TopLeftToBotRight:
+                if (idx < height) return {0, static_cast<int>(idx)};
+                else return {static_cast<int>(idx - height + 1), 0};
+            case TopToBot:
+                return {static_cast<int>(idx), 0};
+            case TopRightToBotLeft:
+                if (idx < width) return {static_cast<int>(idx), 0};
+                else return {static_cast<int>(width-1), static_cast<int>(idx - width + 1)};
+            case RightToLeft:
+                return {static_cast<int>(width-1), static_cast<int>(idx)};
+            default:
+                return {0, 0};
+        }
     }
 
-    __device__ ImgCoord prev(ImgCoord& curr) {
-        return {curr.x+1, curr.y};
+    __device__ ImgCoord next(Direction direction, ImgCoord& curr) {
+        switch (direction) {
+            case LeftToRight:
+                 return {curr.x+1, curr.y};
+            case TopLeftToBotRight:
+                return {curr.x+1, curr.y+1};
+            case TopToBot:
+                return {curr.x, curr.y+1};
+            case TopRightToBotLeft:
+                return {curr.x-1, curr.y+1};
+            case RightToLeft:
+                return {curr.x-1, curr.y};
+            default:
+                return {0, 0};
+        }
     }
 
-    __device__ ImgCoord next(ImgCoord& curr) {
-        return {curr.x+1, curr.y};
-    }
-
-    __host__ __device__ size_t maxSpan(size_t width, size_t height) {
-        return height;
+    __host__ __device__ size_t maxSpan(Direction direction, size_t width, size_t height) {
+        switch (direction) {
+            case LeftToRight:
+                 return height;
+            case TopLeftToBotRight:
+                return height + width - 1;
+             case TopToBot:
+                return width;
+            case TopRightToBotLeft:
+                return height + width -1;
+            case RightToLeft:
+                return height;
+            default:
+                return 0;
+        }
     }
 
     __device__ bool inImage(ImgCoord& curr, size_t width, size_t height) {
@@ -60,11 +101,11 @@ __device__ void addDirLossToAggregateLoss(float* dirLoss, float* aggLoss) {
         aggLoss[disparity] += dirLoss[disparity];
 } 
 
-__global__ void directionalLossKernel(uint32_t* distances, float* aggLoss, float* dirLoss, size_t width, size_t height, size_t maxSpan) {
+__global__ void directionalLossKernel(Direction::Direction direction, uint32_t* distances, float* aggLoss, float* dirLoss, size_t width, size_t height, size_t maxSpan) {
     size_t gridIdx = blockIdx.x * blockDim.x + threadIdx.x;
     if(gridIdx >= maxSpan) return;
 
-    ImgCoord pixCoord = Direction::start(threadIdx.x, width, height);
+    ImgCoord pixCoord = Direction::start(direction, threadIdx.x, width, height);
     // Locations within the disparity arrays
     size_t pixLoc = DisparityArray::pixelLocation(pixCoord, width);
     uint32_t* pixDist = distances + pixLoc;
@@ -78,7 +119,7 @@ __global__ void directionalLossKernel(uint32_t* distances, float* aggLoss, float
     addDirLossToAggregateLoss(pixDirLoss, pixAggLoss);
 
     float* prevPixDirLoss = pixDirLoss;
-    pixCoord = Direction::next(pixCoord);
+    pixCoord = Direction::next(direction, pixCoord);
 
     while(Direction::inImage(pixCoord, width, height)) {
         pixLoc = DisparityArray::pixelLocation(pixCoord, width);
@@ -90,7 +131,7 @@ __global__ void directionalLossKernel(uint32_t* distances, float* aggLoss, float
         addDirLossToAggregateLoss(pixDirLoss, pixAggLoss);
 
         prevPixDirLoss = pixDirLoss;
-        pixCoord = Direction::next(pixCoord);
+        pixCoord = Direction::next(direction, pixCoord);
     }
 }
 
@@ -141,13 +182,14 @@ uint32_t* copyDistancesToDev(HamDistances& distancesHost) {
     return distancesDev;
 }
 
-void lossInDirection(uint32_t* distances, float* aggLoss, float* dirLoss, size_t width, size_t height) {
+void lossInDirection(Direction::Direction direction, uint32_t* distances, float* aggLoss, float* dirLoss, size_t width, size_t height) {
     size_t numThreads = BLOCK_SIZE * BLOCK_SIZE;
+    dim3 threadsPerBlock(numThreads);
 
-    size_t maxSpan = Direction::maxSpan(width, height);
-    size_t numBlocks = ceil(static_cast<float>(maxSpan) / BLOCK_SIZE);
+    size_t maxSpan = Direction::maxSpan(direction, width, height);
+    dim3 numBlocks(ceil(static_cast<float>(maxSpan) / BLOCK_SIZE));
 
-    directionalLossKernel<<<numBlocks, numThreads>>>(distances, aggLoss, dirLoss, width, height, maxSpan);
+    directionalLossKernel<<<numBlocks, threadsPerBlock>>>(direction, distances, aggLoss, dirLoss, width, height, maxSpan);
 }
 
 uint8_t* copyDisparityArrayToHost(uint8_t* dispArrDev, size_t width, size_t height) {
@@ -165,8 +207,10 @@ uint8_t* directionalLoss(HamDistances& distancesHost, size_t width, size_t heigh
     float* aggLossesDev = allocateLoss(width, height);
     float* dirLossesDev = allocateLoss(width, height);
 
-    lossInDirection(distancesDev, aggLossesDev, dirLossesDev, width, height);
-    clearLoss(dirLossesDev, width, height);
+    for (int direction = Direction::LeftToRight; direction <= Direction::RightToLeft; ++direction) {
+        lossInDirection((Direction::Direction)direction, distancesDev, aggLossesDev, dirLossesDev, width, height);
+        clearLoss(dirLossesDev, width, height);
+    }
 
     cudaFree(distancesDev);
     cudaFree(dirLossesDev);
@@ -181,10 +225,16 @@ uint8_t* directionalLoss(HamDistances& distancesHost, size_t width, size_t heigh
     dim3 numBlocks(blocksHorz, blocksVert);
 
     disparityMapKernel<<<numBlocks, threadsPerBlock>>>(dispMapDev, aggLossesDev, width, height);
-
+    cudaDeviceSynchronize();
     cudaFree(aggLossesDev);
 
     uint8_t* dispArrHost = copyDisparityArrayToHost(dispMapDev, width, height);
+    // Synchronize and check for errors
+    cudaError_t err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        printf("2: CUDA Kernel Launch Error: %s\n", cudaGetErrorString(err));
+    }
+    cudaDeviceSynchronize();
 
     cudaFree(dispMapDev);
 
