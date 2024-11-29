@@ -188,20 +188,18 @@ void lossInDirection(Direction::Direction direction, Distances& distances, Loss&
     dirLoss.free();
 }
 
-FlatImage directionalLoss(Distances& distancesHost) {
-    size_t width = distancesHost.dims.cols;
-    size_t height = distancesHost.dims.rows;
+FlatImage directionalLoss(Distances& distances) {
+    size_t width = distances.dims.cols;
+    size_t height = distances.dims.rows;
 
     // distances: row x col x disparity
-    Distances distancesDev = distancesHost.copyToDevice();
     // losses: row * col * disparity
     Loss aggLossesDev = allocateAggregateLoss(width, height);
 
     for (int direction = Direction::LeftToRight; direction <= Direction::RightToLeft; ++direction) {
-        lossInDirection((Direction::Direction)direction, distancesDev, aggLossesDev);
+        // lossInDirection((Direction::Direction)direction, distancesDev, aggLossesDev);
+        lossInDirection((Direction::Direction)direction, distances, aggLossesDev);
     }
-
-    distancesDev.free();
 
     FlatImage dispMapDev = allocateDisparityMap(width, height);
     
@@ -216,16 +214,7 @@ FlatImage directionalLoss(Distances& distancesHost) {
     cudaDeviceSynchronize();
     aggLossesDev.free();
 
-    FlatImage dispMapHost = dispMapDev.copyToHost();
-
-    // Synchronize and check for errors
-    cudaError_t err = cudaGetLastError();
-    if (err != cudaSuccess) {
-        printf("2: CUDA Kernel Launch Error: %s\n", cudaGetErrorString(err));
-    }
     cudaDeviceSynchronize();
 
-    dispMapDev.free();
-
-    return dispMapHost;
+    return dispMapDev;
 }

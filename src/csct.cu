@@ -1,5 +1,4 @@
 #include "csct.cuh"
-#include "util/format.hpp"
 
 __device__ TensorCoord coordInImage(FlatImage& image)
 {
@@ -84,10 +83,7 @@ CSCTResults csct(FlatImage &image)
     csctKernel<<<numBlocks, threadsPerBlock>>>(imageDev, resultsDev);
     cudaDeviceSynchronize();
 
-    CSCTResults resultsHost = resultsDev.copyToHost();
-
     imageDev.free();
-    resultsDev.free();
 
-    return resultsHost;
+    return resultsDev;
 }

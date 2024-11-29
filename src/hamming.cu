@@ -41,8 +41,6 @@ Distances hamming(CSCTResults& leftCSCT, CSCTResults& rightCSCT)
 {
     size_t width = leftCSCT.dims.cols;
     size_t height = leftCSCT.dims.rows;
-    CSCTResults leftCSCTDev = leftCSCT.copyToDevice();
-    CSCTResults rightCSCTDev = rightCSCT.copyToDevice();
 
     dim3 threadsPerBlock(BLOCK_SIZE, BLOCK_SIZE);
 
@@ -54,14 +52,8 @@ Distances hamming(CSCTResults& leftCSCT, CSCTResults& rightCSCT)
 
     Distances distancesDev = allocateDistancesArray(width, height);
 
-    hammingKernel<<<numBlocks, threadsPerBlock>>>(leftCSCTDev, rightCSCTDev, distancesDev);
+    hammingKernel<<<numBlocks, threadsPerBlock>>>(leftCSCT, rightCSCT, distancesDev);
     cudaDeviceSynchronize();
 
-    Distances distancesHost = distancesDev.copyToHost();
-
-    leftCSCTDev.free();
-    rightCSCTDev.free();
-    distancesDev.free();
-
-    return distancesHost;
+    return distancesDev;
 }

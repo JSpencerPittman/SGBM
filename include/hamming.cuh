@@ -5,7 +5,7 @@
 
 #include "csct.cuh"
 
-#define MAX_DISPARITY 200
+#define MAX_DISPARITY 300
 
 typedef Tensor<uint32_t> Distances;
 

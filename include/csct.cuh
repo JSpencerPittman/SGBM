@@ -8,7 +8,7 @@
 #include "tensor.cuh"
 
 #define BLOCK_SIZE 32
-#define RADIUS 2
+#define RADIUS 3
 
 typedef Tensor<Byte> FlatImage;
 typedef Tensor<bool> CSCTResults;
