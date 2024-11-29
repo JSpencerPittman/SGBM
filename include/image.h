@@ -4,14 +4,17 @@
 #include <stddef.h>
 #include <string>
 #include <filesystem>
+#include <optional>
 
 #include <stb/stb_image.h>
 #include <stb/stb_image_write.h>
 
+#include "tensor.cuh"
+
 namespace fs = std::filesystem;
 
 typedef unsigned char Byte;
-typedef std::unique_ptr<Byte[], void (*)(Byte[])> ImageUnqPtr;
+typedef std::unique_ptr<Byte[], void (*)(Byte[])> ImageUniquePtr;
 
 class Image
 {
@@ -20,25 +23,22 @@ public:
 
     void writePng(const fs::path &path) const;
 
-    size_t numBytes() const;
-
     /* -- Getters -- */
-    Byte* data() { return m_data.get(); }
-
-    std::string path() const { return m_path; }
+    std::optional<std::string> path() const { return m_path; }
     bool isGrayscale() const { return m_isGrayscale; }
-    size_t width() const { return m_width; }
-    size_t height() const { return m_height; }
-    size_t channels() const { return m_channels; }
+    size_t width() const { return m_data->dims.cols; }
+    size_t height() const { return m_data->dims.rows; }
+    size_t channels() const { return m_data->dims.channels; }
+    size_t bytes() const { return m_data->bytes(); };
 
 private:
-    ImageUnqPtr m_data;
+    // Copy source image
+    static Tensor<Byte>* reconstructSTBImageAsTensor(Byte stbData[], size_t width, size_t height, size_t channel);
 
-    std::string m_path;
+private:
+    Tensor<Byte>* m_data;
+    std::optional<std::string> m_path;
     bool m_isGrayscale;
-    size_t m_width;
-    size_t m_height;
-    size_t m_channels;
 };
 
 #endif

@@ -1,19 +1,18 @@
 #include "image.h"
 
 #include <stdexcept>
+#include <cstring>
 
 #include <util/format.hpp>
 #include "util/path_check.h"
 #include "util/format.hpp"
 
-#include<iostream>
+#include<stdio.h>
 
 namespace fs = std::filesystem;
 
-
 Image::Image(const fs::path &path, bool grayscale)
-    : m_path(path), m_isGrayscale(grayscale),
-      m_data(nullptr, reinterpret_cast<void (*)(Byte[])>(stbi_image_free))
+    : m_path(path), m_isGrayscale(grayscale), m_data(nullptr)
 {
     Status pathStatus = doesRegularFileExist(path);
     if (!pathStatus.succeed)
@@ -22,14 +21,10 @@ Image::Image(const fs::path &path, bool grayscale)
     int width, height, origNumChannels;
     int desiredChannels = static_cast<int>(grayscale);
 
-    m_data = ImageUnqPtr(
-        stbi_load(path.c_str(), &width, &height, &origNumChannels, desiredChannels),
-        reinterpret_cast<void(*)(Byte[])>(stbi_image_free)
-    );
-
-    m_width = static_cast<size_t>(width);
-    m_height = static_cast<size_t>(height);
-    m_channels = grayscale ? 1 : static_cast<size_t>(origNumChannels);
+    Byte* stbData = stbi_load(path.c_str(), &width, &height, &origNumChannels, desiredChannels);
+    size_t actualChannels = grayscale ? 1 : static_cast<size_t>(origNumChannels);
+    m_data = reconstructSTBImageAsTensor(stbData, width, height, actualChannels);
+    stbi_image_free(stbData);
 }
 
 void Image::writePng(const fs::path& path) const {
@@ -41,9 +36,14 @@ void Image::writePng(const fs::path& path) const {
     Status parentDirStatus = doesDirectoryExist(path.parent_path());
     if(!parentDirStatus.succeed) throw std::invalid_argument(parentDirStatus.errorMessage.c_str());
 
-    stbi_write_png(path.c_str(), m_width, m_height, m_channels, m_data.get(), m_width * m_channels);
+    printf("Image Shape (%lu, %lu, %lu)\n", height(), width(), channels());
+    stbi_write_png(path.c_str(), width(), height(), channels(), m_data->data, width() * channels());
 }
 
-size_t Image::numBytes() const {
-    return m_width * m_height * m_channels * sizeof(Byte);
+Tensor<Byte>* Image::reconstructSTBImageAsTensor(Byte stbData[], size_t width, size_t height, size_t channels) {
+    TensorDims imageDims(height, width, channels);
+    size_t numValues = height * width * channels;
+    Byte* tensorData = new Byte[numValues];
+    std::memcpy(tensorData, stbData, numValues * sizeof(Byte));
+    return new Tensor(imageDims, tensorData, false);
 }
