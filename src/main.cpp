@@ -12,59 +12,45 @@
 #include "tensor.cuh"
 #include "median.cuh"
 
-int main() {
-    // Load Images
+int main()
+{
     std::filesystem::path leftImagePath = "../data/left.png";
     std::filesystem::path rightImagePath = "../data/right.png";
 
     Image leftImage(leftImagePath, true);
     Image rightImage(rightImagePath, true);
-
-    // Save Grayscale images
-    std::filesystem::path leftImageGraySavePath = "../data/left_gray.png";
-    std::filesystem::path rightImageGraySavePath = "../data/right_gray.png";
-    leftImage.writePng(leftImageGraySavePath);
-    rightImage.writePng(rightImageGraySavePath);
-
-    size_t imageWidth = leftImage.width();
-    size_t imageHeight = rightImage.height();
+    printf("Loaded left and right image.\n");
 
     // Center-Symmetric Census Transform
-    TensorDims imageDims(leftImage.height(), leftImage.width(), leftImage.channels());
-    FlatImage leftImageF(imageDims, leftImage.data());
-    FlatImage rightImageF(imageDims, rightImage.data());
-
+    FlatImage leftImageF(leftImage.data()->dims, leftImage.data()->data);
+    FlatImage rightImageF(rightImage.data()->dims, rightImage.data()->data);
     CSCTResults leftCSCTRes = csct(leftImageF);
     CSCTResults rightCSCTRes = csct(rightImageF);
+    printf("Completed Center-Symmetric Census Transform.\n");
 
-    printf("Completed Census Transforms!\n");
-
+    // Hamming Distance Calculation
     Distances hams = hamming(leftCSCTRes, rightCSCTRes);
-
     leftCSCTRes.free();
     rightCSCTRes.free();
+    printf("Completed Hamming Distance Calculations.\n");
 
-    printf("Completed Hamming Distance Calculations!\n");
-
+    // Directional Loss
     FlatImage disparityMap = directionalLoss(hams);
-
     hams.free();
+    printf("Completed Directional Loss.\n");
 
-    printf("Finished Estimating Disparity Map!\n");
-
-    // std::filesystem::path outPath("disparity.png");
-    // stbi_write_png(outPath.c_str(), hams.dims.cols, imageHeight, 1, disparityMap.data, hams.dims.cols);
-
+    // Median Blurring
     FlatImage blurDispMap = medianBlur(disparityMap);
-
     disparityMap.free();
+    printf("Completed Median Blurring.\n");
 
-    printf("Finished Blurring Disparity Map!\n");
-
-    std::filesystem::path outPath2("disparity_blur.png");
-    stbi_write_png(outPath2.c_str(), hams.dims.cols, imageHeight, 1, blurDispMap.data, hams.dims.cols);
-
+    // Save Disparity Map
+    size_t imageWidth = leftImage.width();
+    size_t imageHeight = rightImage.height();
+    std::filesystem::path outPath("disparity_blur.png");
+    stbi_write_png(outPath.c_str(), hams.dims.cols, imageHeight, 1, blurDispMap.data, hams.dims.cols);
     blurDispMap.free();
+    printf("Saved Disparity Map To Disk.\n");
 
     return 0;
 }

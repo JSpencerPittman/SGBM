@@ -14,14 +14,16 @@
 namespace fs = std::filesystem;
 
 typedef unsigned char Byte;
-typedef std::unique_ptr<Byte[], void (*)(Byte[])> ImageUniquePtr;
 
 class Image
 {
 public:
     Image(const fs::path &path, bool grayscale = false);
+    ~Image();
 
     void writePng(const fs::path &path) const;
+
+    Tensor<Byte>* data() {return m_data.get(); };
 
     /* -- Getters -- */
     std::optional<std::string> path() const { return m_path; }
@@ -33,10 +35,15 @@ public:
 
 private:
     // Copy source image
-    static Tensor<Byte>* reconstructSTBImageAsTensor(Byte stbData[], size_t width, size_t height, size_t channel);
+    static std::unique_ptr<Tensor<Byte>> reconstructSTBImageAsTensor(Byte stbData[], size_t width,
+                                                                     size_t height, size_t channel);
+    // static std::unique_ptr<Tensor<Byte>> reconstructSTBImageAsTensor(std::unique_ptr<Byte> stbData,
+    //                                                                  size_t width,
+    //                                                                  size_t height,
+    //                                                                  size_t channel);
 
 private:
-    Tensor<Byte>* m_data;
+    std::unique_ptr<Tensor<Byte>> m_data;
     std::optional<std::string> m_path;
     bool m_isGrayscale;
 };
