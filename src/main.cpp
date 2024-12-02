@@ -7,10 +7,17 @@
 #include "image.h"
 #include "sgbm.h"
 
-int main()
+int main(int argc, char* argv[])
 {
-    std::filesystem::path leftImagePath = "../data/left.png";
-    std::filesystem::path rightImagePath = "../data/right.png";
+    if(argc != 3 && argc != 4)
+        throw std::runtime_error("Missing arguments: path to left and right image paths, respectively.");
+
+    std::filesystem::path leftImagePath(argv[1]);
+    std::filesystem::path rightImagePath(argv[2]);
+    
+    std::filesystem::path outputPath;
+    if(argc == 4) outputPath = std::filesystem::path(argv[3]);
+    else outputPath = "disparity.png";
 
     Image leftImage(leftImagePath, true);
     Image rightImage(rightImagePath, true);
@@ -18,8 +25,7 @@ int main()
 
     Image blurDispMap = sgbm(leftImage, rightImage);
 
-    std::filesystem::path outPath("disparity_blur.png");
-    blurDispMap.writePng(outPath);
+    blurDispMap.writePng(outputPath);
     printf("Saved Disparity Map To Disk.\n");
 
     return 0;
