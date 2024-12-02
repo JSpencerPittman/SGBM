@@ -5,10 +5,6 @@
 
 #include "csct.cuh"
 
-#define MAX_DISPARITY 300
-
-typedef Tensor<uint32_t> Distances;
-
-Distances hamming(CSCTResults& leftCSCT, CSCTResults& rightCSCT);
+Tensor<uint32_t> hamming(Tensor<bool>& leftCSCT, Tensor<bool>& rightCSCT);
 
 #endif

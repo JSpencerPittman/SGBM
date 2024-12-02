@@ -2,7 +2,7 @@
 
 #include <algorithm>
 
-__device__ TensorCoord coordInImageMedian(FlatImage& image)
+__device__ TensorCoord coordInImageMedian(Tensor<Byte>& image)
 {
     int tileSize = BLOCK_SIZE - (2 * MEDIAN_RADIUS );
     int xCoordInImg = (blockIdx.x * tileSize) - MEDIAN_RADIUS + threadIdx.x;
@@ -40,8 +40,8 @@ __device__ void selectionSort(Byte* arr, size_t len) {
 }
 
 
-__device__ void medianBlurAtPixel(FlatImage& dispMapBlock,
-                                  FlatImage& blurDispMap,
+__device__ void medianBlurAtPixel(Tensor<Byte>& dispMapBlock,
+                                  Tensor<Byte>& blurDispMap,
                                   TensorCoord coordDispMap,
                                   Byte* kernelCache) {
     for(int diffY = -MEDIAN_RADIUS; diffY <= MEDIAN_RADIUS; ++diffY)
@@ -56,11 +56,11 @@ __device__ void medianBlurAtPixel(FlatImage& dispMapBlock,
     blurDispMap(coordDispMap) = median;
 }
 
-__global__ void medianBlurKernel(FlatImage dispMap, FlatImage blurDispMap) {
+__global__ void medianBlurKernel(Tensor<Byte> dispMap, Tensor<Byte> blurDispMap) {
     __shared__ Byte dispMapBlockData[BLOCK_SIZE * BLOCK_SIZE];
     __shared__ Byte kernelCache[MEDIAN_TILE_SIZE * MEDIAN_TILE_SIZE * MEDIAN_DIAMETER * MEDIAN_DIAMETER];
 
-    FlatImage dispMapBlock({BLOCK_SIZE, BLOCK_SIZE, 1}, (Byte*)&dispMapBlockData);
+    Tensor<Byte> dispMapBlock({BLOCK_SIZE, BLOCK_SIZE, 1}, (Byte*)&dispMapBlockData);
 
     TensorCoord coordDispMap = coordInImageMedian(dispMap);
     dispMapBlock(threadIdx.y, threadIdx.x) = dispMap(coordDispMap);
@@ -72,12 +72,12 @@ __global__ void medianBlurKernel(FlatImage dispMap, FlatImage blurDispMap) {
     }
 }
 
-FlatImage allocateBlurDispMap(FlatImage& image) {
+Tensor<Byte> allocateBlurDispMap(Tensor<Byte>& image) {
     return {image.dims, true};
 }
 
-FlatImage medianBlur(FlatImage& dispMap) {
-    FlatImage blurDispMap = allocateBlurDispMap(dispMap);
+Tensor<Byte> medianBlur(Tensor<Byte>& dispMap) {
+    Tensor<Byte> blurDispMap = allocateBlurDispMap(dispMap);
 
     dim3 threadsPerBlock(BLOCK_SIZE, BLOCK_SIZE);
     float tileSize = static_cast<float>(BLOCK_SIZE) - (2 * static_cast<float>(MEDIAN_RADIUS));
@@ -95,7 +95,7 @@ FlatImage medianBlur(FlatImage& dispMap) {
     }
     cudaDeviceSynchronize();
 
-    FlatImage blurDispMapHost = blurDispMap.copyToHost();
+    Tensor<Byte> blurDispMapHost = blurDispMap.copyToHost();
 
     blurDispMap.free();
 

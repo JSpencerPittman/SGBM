@@ -1,6 +1,6 @@
 #include "csct.cuh"
 
-__device__ TensorCoord coordInImage(FlatImage& image)
+__device__ TensorCoord coordInImage(Tensor<Byte>& image)
 {
     int tileSize = BLOCK_SIZE - (2 * RADIUS );
     int xCoordInImg = (blockIdx.x * tileSize) - RADIUS + threadIdx.x;
@@ -25,52 +25,52 @@ __device__ bool insideHalo()
     return true;
 }
 
-__device__ void censusTransform(FlatImage& imageBlock, CSCTResults& results, TensorCoord coordImage)
+__device__ void censusTransform(Tensor<Byte>& imageBlock, Tensor<bool>& csctResults, TensorCoord coordImage)
 {
     size_t compIdx = 0;
     int radiusInt = static_cast<int>(RADIUS);
     for(int diffX = -radiusInt; diffX < 0; ++diffX) {
         for(int diffY = -radiusInt; diffY <= radiusInt; ++diffY) {
-            results(coordImage.row, coordImage.col, compIdx) = 
+            csctResults(coordImage.row, coordImage.col, compIdx) = 
                 imageBlock(threadIdx.y + diffY, threadIdx.x + diffX) >=
                 imageBlock(threadIdx.y - diffY, threadIdx.x - diffX);
             ++compIdx;
         }
     }
     for(int diffY = -radiusInt; diffY < 0; ++diffY) {
-        results(coordImage.row, coordImage.col, compIdx) = 
+        csctResults(coordImage.row, coordImage.col, compIdx) = 
                 imageBlock(threadIdx.y + diffY, threadIdx.x) >=
                 imageBlock(threadIdx.y - diffY, threadIdx.x);
         ++compIdx;
     }
 }
 
-__global__ void csctKernel(FlatImage image, CSCTResults results)
+__global__ void csctKernel(Tensor<Byte> image, Tensor<bool> csctResults)
 {
     __shared__ Byte imageBlockData[BLOCK_SIZE * BLOCK_SIZE];
-    FlatImage imageBlock({BLOCK_SIZE, BLOCK_SIZE, 1}, (Byte*)&imageBlockData);
+    Tensor<Byte> imageBlock({BLOCK_SIZE, BLOCK_SIZE, 1}, (Byte*)&imageBlockData);
 
     TensorCoord coordImage = coordInImage(image);
     imageBlock(threadIdx.y, threadIdx.x) = image(coordImage);
     __syncthreads();
 
     if (insideHalo())
-        censusTransform(imageBlock, results, coordImage);
+        censusTransform(imageBlock, csctResults, coordImage);
 };
 
-CSCTResults allocateCSCTResultArray(Image& image) {
+Tensor<bool> allocateCSCTResultArray(Image& image) {
     size_t diameter = 2 * RADIUS + 1;
     size_t compPerPix = diameter * RADIUS + RADIUS;
     TensorDims csctResShape(image.height(), image.width(), compPerPix);
-    CSCTResults resultsDev(csctResShape, true);
+    Tensor<bool> resultsDev(csctResShape, true);
     return resultsDev;
 }
 
-CSCTResults csct(Image &image)
+Tensor<bool> csct(Image &image)
 {
     // Load images onto GPU
-    FlatImage imageDev = image.data()->copyToDevice();
-    CSCTResults resultsDev = allocateCSCTResultArray(image);
+    Tensor<Byte> imageDev = image.data()->copyToDevice();
+    Tensor<bool> resultsDev = allocateCSCTResultArray(image);
 
     dim3 threadsPerBlock(BLOCK_SIZE, BLOCK_SIZE);
     float tileSize = static_cast<float>(BLOCK_SIZE) - (2 * static_cast<float>(RADIUS));

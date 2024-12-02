@@ -9,7 +9,7 @@ __device__ uint32_t calcDistance(bool *bitSeq1, bool *bitSeq2, size_t seqLen)
     return distance;
 }
 
-__global__ void hammingKernel(CSCTResults leftCSCT, CSCTResults rightCSCT, Distances distances)
+__global__ void hammingKernel(Tensor<bool> leftCSCT, Tensor<bool> rightCSCT, Tensor<uint32_t> distances)
 {
     size_t width = leftCSCT.dims.cols;
     size_t height = leftCSCT.dims.rows;
@@ -31,13 +31,13 @@ __global__ void hammingKernel(CSCTResults leftCSCT, CSCTResults rightCSCT, Dista
     }
 }
 
-Distances allocateDistancesArray(size_t width, size_t height)
+Tensor<uint32_t> allocateDistancesArray(size_t width, size_t height)
 {
     TensorDims distShape (height, width - MAX_DISPARITY, MAX_DISPARITY+1);
     return {distShape, true};
 }
 
-Distances hamming(CSCTResults& leftCSCT, CSCTResults& rightCSCT)
+Tensor<uint32_t> hamming(Tensor<bool>& leftCSCT, Tensor<bool>& rightCSCT)
 {
     size_t width = leftCSCT.dims.cols;
     size_t height = leftCSCT.dims.rows;
@@ -50,7 +50,7 @@ Distances hamming(CSCTResults& leftCSCT, CSCTResults& rightCSCT)
         ceil((static_cast<float>(width) - MAX_DISPARITY) / BLOCK_SIZE));
     dim3 numBlocks(blocksHorz, blocksVert);
 
-    Distances distancesDev = allocateDistancesArray(width, height);
+    Tensor<uint32_t> distancesDev = allocateDistancesArray(width, height);
 
     hammingKernel<<<numBlocks, threadsPerBlock>>>(leftCSCT, rightCSCT, distancesDev);
     cudaDeviceSynchronize();
