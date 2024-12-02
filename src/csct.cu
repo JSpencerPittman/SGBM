@@ -1,4 +1,4 @@
-#include "csct.cuh"
+#include "sgbm.h"
 
 __device__ TensorCoord coordInImage(Tensor<Byte>& image)
 {

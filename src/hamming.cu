@@ -1,4 +1,4 @@
-#include "hamming.cuh"
+#include "sgbm.h"
 
 __device__ uint32_t calcDistance(bool *bitSeq1, bool *bitSeq2, size_t seqLen)
 {

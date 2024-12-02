@@ -1,6 +1,4 @@
-#include "median.cuh"
-
-#include <algorithm>
+#include "sgbm.h"
 
 __device__ TensorCoord coordInImageMedian(Tensor<Byte>& image)
 {

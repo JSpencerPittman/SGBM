@@ -1,4 +1,4 @@
-#include "directional.cuh"
+#include "sgbm.h"
 
 struct ImgCoord
 {
