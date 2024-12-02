@@ -1,2 +1,5 @@
 # Build artifacts
 build
+
+# Jupyter notebook exploration
+py_inv
