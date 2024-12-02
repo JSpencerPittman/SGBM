@@ -19,6 +19,7 @@ class Image
 {
 public:
     Image(const fs::path &path, bool grayscale = false);
+    Image(Tensor<Byte>& tensor);
     ~Image();
 
     void writePng(const fs::path &path) const;
@@ -37,10 +38,6 @@ private:
     // Copy source image
     static std::unique_ptr<Tensor<Byte>> reconstructSTBImageAsTensor(Byte stbData[], size_t width,
                                                                      size_t height, size_t channel);
-    // static std::unique_ptr<Tensor<Byte>> reconstructSTBImageAsTensor(std::unique_ptr<Byte> stbData,
-    //                                                                  size_t width,
-    //                                                                  size_t height,
-    //                                                                  size_t channel);
 
 private:
     std::unique_ptr<Tensor<Byte>> m_data;

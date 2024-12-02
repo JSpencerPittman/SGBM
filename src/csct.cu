@@ -58,26 +58,26 @@ __global__ void csctKernel(FlatImage image, CSCTResults results)
         censusTransform(imageBlock, results, coordImage);
 };
 
-CSCTResults allocateCSCTResultArray(FlatImage& image) {
+CSCTResults allocateCSCTResultArray(Image& image) {
     size_t diameter = 2 * RADIUS + 1;
     size_t compPerPix = diameter * RADIUS + RADIUS;
-    TensorDims csctResShape(image.dims.rows, image.dims.cols, compPerPix);
+    TensorDims csctResShape(image.height(), image.width(), compPerPix);
     CSCTResults resultsDev(csctResShape, true);
     return resultsDev;
 }
 
-CSCTResults csct(FlatImage &image)
+CSCTResults csct(Image &image)
 {
     // Load images onto GPU
-    FlatImage imageDev = image.copyToDevice();
+    FlatImage imageDev = image.data()->copyToDevice();
     CSCTResults resultsDev = allocateCSCTResultArray(image);
 
     dim3 threadsPerBlock(BLOCK_SIZE, BLOCK_SIZE);
     float tileSize = static_cast<float>(BLOCK_SIZE) - (2 * static_cast<float>(RADIUS));
     size_t blocksVert = static_cast<size_t>(
-        ceil(static_cast<float>(image.dims.rows) / tileSize));
+        ceil(static_cast<float>(image.height()) / tileSize));
     size_t blocksHorz = static_cast<size_t>(
-        ceil(static_cast<float>(image.dims.cols) / tileSize));
+        ceil(static_cast<float>(image.width()) / tileSize));
     dim3 numBlocks(blocksHorz, blocksVert);
 
     csctKernel<<<numBlocks, threadsPerBlock>>>(imageDev, resultsDev);

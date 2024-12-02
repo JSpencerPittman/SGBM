@@ -13,6 +13,6 @@
 typedef Tensor<Byte> FlatImage;
 typedef Tensor<bool> CSCTResults;
 
-CSCTResults csct(FlatImage &image);
+CSCTResults csct(Image &image);
 
 #endif

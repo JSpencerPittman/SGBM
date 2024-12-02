@@ -25,6 +25,12 @@ Image::Image(const fs::path &path, bool grayscale)
     stbi_image_free(stbData);
 }
 
+Image::Image(Tensor<Byte>& data)
+{
+    m_data = std::make_unique<Tensor<Byte>>(data);
+    m_isGrayscale = data.dims.channels == 1;
+}
+
 Image::~Image() {
     m_data->free();
 }
