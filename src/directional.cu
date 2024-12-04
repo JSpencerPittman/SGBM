@@ -1,4 +1,4 @@
-#include "sgbm.h"
+#include "sgbm.cuh"
 
 struct ImgCoord
 {
@@ -14,7 +14,10 @@ namespace Direction
         TopLeftToBotRight,
         TopToBot,
         TopRightToBotLeft,
-        RightToLeft
+        RightToLeft,
+        BotRightToTopLeft,
+        BotToTop,
+        BotLeftToTopRight
     };
 
     __device__ ImgCoord start(Direction direction, size_t idx, size_t width, size_t height)
@@ -37,6 +40,18 @@ namespace Direction
                 return {static_cast<int>(width - 1), static_cast<int>(idx - width + 1)};
         case RightToLeft:
             return {static_cast<int>(width - 1), static_cast<int>(idx)};
+        case BotRightToTopLeft:
+             if (idx < width)
+                return {static_cast<int>(idx), static_cast<int>(height - 1)};
+            else
+                return {static_cast<int>(width - 1), static_cast<int>(idx - width)};
+        case BotToTop:
+            return {static_cast<int>(idx), static_cast<int>(height - 1)};
+        case BotLeftToTopRight:
+            if (idx < width)
+                return {static_cast<int>(idx), static_cast<int>(height - 1)};
+            else
+                return {static_cast<int>(0), static_cast<int>(idx - width)}; 
         default:
             return {0, 0};
         }
@@ -56,6 +71,12 @@ namespace Direction
             return {curr.x - 1, curr.y + 1};
         case RightToLeft:
             return {curr.x - 1, curr.y};
+        case BotRightToTopLeft:
+            return {curr.x - 1, curr.y - 1};
+        case BotToTop:
+            return {curr.x, curr.y - 1};
+        case BotLeftToTopRight:
+            return {curr.x + 1, curr.y - 1};
         default:
             return {0, 0};
         }
@@ -75,6 +96,12 @@ namespace Direction
             return height + width - 1;
         case RightToLeft:
             return height;
+        case BotRightToTopLeft:
+            return height + width - 1;
+        case BotToTop:
+            return width;
+        case BotLeftToTopRight:
+            return height + width - 1;
         default:
             return 0;
         }
@@ -238,11 +265,8 @@ Tensor<Byte> directionalLoss(Tensor<uint32_t> &distances)
     // losses: row * col * disparity
     Tensor<float> aggLossesDev = allocateAggregateLoss(width, height);
 
-    for (int direction = Direction::LeftToRight; direction <= Direction::RightToLeft; ++direction)
-    {
-        // lossInDirection((Direction::Direction)direction, distancesDev, aggLossesDev);
+    for (int direction = Direction::LeftToRight; direction < NUM_DIRECTIONS; ++direction)
         lossInDirection((Direction::Direction)direction, distances, aggLossesDev);
-    }
 
     Tensor<Byte> dispMapDev = allocateDisparityMap(width, height);
 

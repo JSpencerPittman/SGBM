@@ -1,10 +1,10 @@
-#include "sgbm.h"
+#include "sgbm.cuh"
 
-__device__ TensorCoord coordInImage(Tensor<Byte>& image)
+__device__ TensorCoord coordInImage(Tensor<Byte> &image)
 {
-    int tileSize = BLOCK_SIZE - (2 * RADIUS );
-    int xCoordInImg = (blockIdx.x * tileSize) - RADIUS + threadIdx.x;
-    int yCoordInImg = (blockIdx.y * tileSize) - RADIUS + threadIdx.y;
+    int tileSize = BLOCK_SIZE - (2 * CSCT_RADIUS);
+    int xCoordInImg = (blockIdx.x * tileSize) - CSCT_RADIUS + threadIdx.x;
+    int yCoordInImg = (blockIdx.y * tileSize) - CSCT_RADIUS + threadIdx.y;
 
     /*
     If a coordinate lays outside of the image's bounds then the closest pixel is used for that value.
@@ -18,29 +18,32 @@ __device__ TensorCoord coordInImage(Tensor<Byte>& image)
 
 __device__ bool insideHalo()
 {
-    if (threadIdx.x < RADIUS || blockDim.x - RADIUS <= threadIdx.x)
+    if (threadIdx.x < CSCT_RADIUS || blockDim.x - CSCT_RADIUS <= threadIdx.x)
         return false;
-    else if (threadIdx.y < RADIUS || blockDim.y - RADIUS <= threadIdx.y)
+    else if (threadIdx.y < CSCT_RADIUS || blockDim.y - CSCT_RADIUS <= threadIdx.y)
         return false;
     return true;
 }
 
-__device__ void censusTransform(Tensor<Byte>& imageBlock, Tensor<bool>& csctResults, TensorCoord coordImage)
+__device__ void censusTransform(Tensor<Byte> &imageBlock, Tensor<bool> &csctResults, TensorCoord coordImage)
 {
     size_t compIdx = 0;
-    int radiusInt = static_cast<int>(RADIUS);
-    for(int diffX = -radiusInt; diffX < 0; ++diffX) {
-        for(int diffY = -radiusInt; diffY <= radiusInt; ++diffY) {
-            csctResults(coordImage.row, coordImage.col, compIdx) = 
+    int radiusInt = static_cast<int>(CSCT_RADIUS);
+    for (int diffX = -radiusInt; diffX < 0; ++diffX)
+    {
+        for (int diffY = -radiusInt; diffY <= radiusInt; ++diffY)
+        {
+            csctResults(coordImage.row, coordImage.col, compIdx) =
                 imageBlock(threadIdx.y + diffY, threadIdx.x + diffX) >=
                 imageBlock(threadIdx.y - diffY, threadIdx.x - diffX);
             ++compIdx;
         }
     }
-    for(int diffY = -radiusInt; diffY < 0; ++diffY) {
-        csctResults(coordImage.row, coordImage.col, compIdx) = 
-                imageBlock(threadIdx.y + diffY, threadIdx.x) >=
-                imageBlock(threadIdx.y - diffY, threadIdx.x);
+    for (int diffY = -radiusInt; diffY < 0; ++diffY)
+    {
+        csctResults(coordImage.row, coordImage.col, compIdx) =
+            imageBlock(threadIdx.y + diffY, threadIdx.x) >=
+            imageBlock(threadIdx.y - diffY, threadIdx.x);
         ++compIdx;
     }
 }
@@ -48,7 +51,7 @@ __device__ void censusTransform(Tensor<Byte>& imageBlock, Tensor<bool>& csctResu
 __global__ void csctKernel(Tensor<Byte> image, Tensor<bool> csctResults)
 {
     __shared__ Byte imageBlockData[BLOCK_SIZE * BLOCK_SIZE];
-    Tensor<Byte> imageBlock({BLOCK_SIZE, BLOCK_SIZE, 1}, (Byte*)&imageBlockData);
+    Tensor<Byte> imageBlock({BLOCK_SIZE, BLOCK_SIZE, 1}, (Byte *)&imageBlockData);
 
     TensorCoord coordImage = coordInImage(image);
     imageBlock(threadIdx.y, threadIdx.x) = image(coordImage);
@@ -58,9 +61,10 @@ __global__ void csctKernel(Tensor<Byte> image, Tensor<bool> csctResults)
         censusTransform(imageBlock, csctResults, coordImage);
 };
 
-Tensor<bool> allocateCSCTResultArray(Image& image) {
-    size_t diameter = 2 * RADIUS + 1;
-    size_t compPerPix = diameter * RADIUS + RADIUS;
+Tensor<bool> allocateCSCTResultArray(Image &image)
+{
+    size_t diameter = 2 * CSCT_RADIUS + 1;
+    size_t compPerPix = diameter * CSCT_RADIUS + CSCT_RADIUS;
     TensorDims csctResShape(image.height(), image.width(), compPerPix);
     Tensor<bool> resultsDev(csctResShape, true);
     return resultsDev;
@@ -73,7 +77,7 @@ Tensor<bool> csct(Image &image)
     Tensor<bool> resultsDev = allocateCSCTResultArray(image);
 
     dim3 threadsPerBlock(BLOCK_SIZE, BLOCK_SIZE);
-    float tileSize = static_cast<float>(BLOCK_SIZE) - (2 * static_cast<float>(RADIUS));
+    float tileSize = static_cast<float>(BLOCK_SIZE) - (2 * static_cast<float>(CSCT_RADIUS));
     size_t blocksVert = static_cast<size_t>(
         ceil(static_cast<float>(image.height()) / tileSize));
     size_t blocksHorz = static_cast<size_t>(

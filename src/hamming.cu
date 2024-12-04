@@ -1,4 +1,4 @@
-#include "sgbm.h"
+#include "sgbm.cuh"
 
 __device__ uint32_t calcDistance(bool *bitSeq1, bool *bitSeq2, size_t seqLen)
 {

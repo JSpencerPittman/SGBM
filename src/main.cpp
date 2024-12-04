@@ -5,7 +5,7 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 
 #include "image.h"
-#include "sgbm.h"
+#include "sgbm.cuh"
 
 int main(int argc, char* argv[])
 {

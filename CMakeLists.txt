@@ -12,9 +12,14 @@ enable_language(CUDA)
 
 project(SGBM VERSION 1.0)
 
-SET(SOURCE_CXX_FILES src/main.cpp src/image.cpp src/sgbm.cpp)
-SET(SOURCE_CUDA_FILES src/csct.cu src/hamming.cu src/directional.cu src/median.cu)
+find_package(OpenCV REQUIRED)
+
+SET(SOURCE_CXX_FILES src/main.cpp src/image.cpp)
+SET(SOURCE_CUDA_FILES src/csct.cu src/hamming.cu src/directional.cu src/rank_filt.cu src/sgbm.cu)
 
 add_executable(${PROJECT_NAME} ${SOURCE_CXX_FILES} ${SOURCE_CUDA_FILES})
+add_executable(OPENCV_BM benchmark/opencv_bench.cpp)
 
 target_include_directories(${PROJECT_NAME} PRIVATE include lib/include)
+
+target_link_libraries(OPENCV_BM PRIVATE ${OpenCV_LIBS})
