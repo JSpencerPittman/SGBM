@@ -26,10 +26,11 @@ int main(int argc, char *argv[])
     // Load images
     cv::Mat leftImage = cv::imread(leftImagePath, cv::IMREAD_GRAYSCALE);
     cv::Mat rightImage = cv::imread(rightImagePath, cv::IMREAD_GRAYSCALE);
-    printf("Loaded left and right image.\n");
+
+    auto start = std::chrono::system_clock::now();
 
     // SGBM
-    auto sgbm = cv::StereoSGBM::create(0, 65, 9, 7, 17, -1, -1, -1, 200, 2, cv::StereoSGBM::MODE_SGBM);
+    auto sgbm = cv::StereoSGBM::create(0, 65, 9, 7, 17, -1, -1, -1, -1, -1, cv::StereoSGBM::MODE_SGBM);
     cv::Mat disparityMap;
     sgbm->compute(leftImage, rightImage, disparityMap);
 
@@ -45,8 +46,12 @@ int main(int argc, char *argv[])
 
     disparityMap.convertTo(disparityMap, CV_8U);
 
+    auto end = std::chrono::system_clock::now();
+    auto duration = std::chrono::duration<double>(end - start);
+
     cv::imwrite(outputPath, disparityMap);
-    printf("Saved Disparity Map To Disk.\n");
+
+    printf("Duration: %lf\n", duration.count());
 
     return 0;
 }

@@ -7,6 +7,8 @@
 #include "image.h"
 #include "sgbm.cuh"
 
+#include <chrono>
+
 int main(int argc, char* argv[])
 {
     if(argc != 3 && argc != 4)
@@ -21,12 +23,17 @@ int main(int argc, char* argv[])
 
     Image leftImage(leftImagePath, true);
     Image rightImage(rightImagePath, true);
-    printf("Loaded left and right image.\n");
+
+    auto start = std::chrono::system_clock::now();
 
     Image blurDispMap = sgbm(leftImage, rightImage);
 
+    auto end = std::chrono::system_clock::now();
+    auto duration = std::chrono::duration<double>(end - start);
+
     blurDispMap.writePng(outputPath);
-    printf("Saved Disparity Map To Disk.\n");
+
+    printf("Duration: %lf\n", duration.count());
 
     return 0;
 }
