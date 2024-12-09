@@ -1,0 +1,15 @@
+#!/bin/bash
+
+mkdir -p results/cuda
+mkdir -p results/opencv
+
+for i in $(seq 0 4);
+do
+    echo "CUDA - $i"
+    ./SGBM ../data/left/left_$i.png  ../data/right/right_$i.png results/cuda/disp_map_$i.png
+    ./EVAL ../data/disp_map/disp_map_$i.png  results/cuda/disp_map_$i.png
+    echo -e "\nOPENCV - $i"
+     ./OPENCV_BM ../data/left/left_$i.png  ../data/right/right_$i.png results/opencv/disp_map_$i.png
+    ./EVAL ../data/disp_map/disp_map_$i.png  results/opencv/disp_map_$i.png
+    echo "--------------------------------"
+done

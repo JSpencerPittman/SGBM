@@ -19,7 +19,9 @@ SET(SOURCE_CUDA_FILES src/csct.cu src/hamming.cu src/directional.cu src/rank_fil
 
 add_executable(${PROJECT_NAME} ${SOURCE_CXX_FILES} ${SOURCE_CUDA_FILES})
 add_executable(OPENCV_BM benchmark/opencv_bench.cpp)
+add_executable(EVAL benchmark/eval.cpp)
 
 target_include_directories(${PROJECT_NAME} PRIVATE include lib/include)
 
 target_link_libraries(OPENCV_BM PRIVATE ${OpenCV_LIBS})
+target_link_libraries(EVAL PRIVATE ${OpenCV_LIBS})
