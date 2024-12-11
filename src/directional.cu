@@ -165,7 +165,7 @@ __global__ void directionalLossKernel(Direction::Direction direction,
     float *prevDirLoss = dirLoss.colPtr(gridIdx, toggle);
     float *currDirLoss = dirLoss.colPtr(gridIdx, !toggle);
 
-    ImgCoord pixCoord = Direction::start(direction, threadIdx.x, width, height);
+    ImgCoord pixCoord = Direction::start(direction, gridIdx, width, height);
     // Locations within the disparity arrays
     float *pixAggLoss = aggLoss.colPtr(pixCoord.y, pixCoord.x);
 

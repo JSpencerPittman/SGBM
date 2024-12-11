@@ -81,9 +81,6 @@ __device__ void minMaxFilterAtPixel(Tensor<Byte> &dispMapBlock,
                                     TensorCoord coordDispMap,
                                     bool isMaxOperation)
 {
-    // bool log = blockIdx.x == 0 && blockIdx.y == 0 && threadIdx.x == 2 && threadIdx.y == 2;
-    // if(log) printf("Latched onto target thread.\n");
-    // if(log) printf("%lu, %lu, %lu\n", dispMapBlock.dims.rows, dispMapBlock.dims.cols, dispMapBlock.dims.channels);
     Byte value = blurDispMap(coordDispMap);
     for (int diffY = -MORPH_RADIUS; diffY <= MORPH_RADIUS; ++diffY)
         for (int diffX = -MORPH_RADIUS; diffX <= MORPH_RADIUS; ++diffX)

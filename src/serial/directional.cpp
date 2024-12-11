@@ -210,13 +210,6 @@ void disparityMapKernel(Tensor<Byte>& dispMap, Tensor<float>& loss,
                     minDisparity = disparity;
                 }
             }
-            if(r == 0 && c == 0) {
-                printf("SAMPLE DISPARITY\n");
-                for (size_t disparity = 0; disparity <= MAX_DISPARITY; ++disparity) {
-                    printf("%f, ", loss(pixCoord.y, pixCoord.x, disparity));
-                }
-                printf("\n");
-            }
 
             dispMap(pixCoord.y, pixCoord.x) = static_cast<Byte>(minDisparity);
         }

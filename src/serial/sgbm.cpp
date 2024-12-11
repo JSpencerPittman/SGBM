@@ -10,14 +10,28 @@ Image sgbm(Image& leftImage, Image& rightImage) {
     leftCSCTRes.free();
     rightCSCTRes.free();
 
-    printf("HAMMING TEST\n");
-    for(size_t idx = 0; idx <= MAX_DISPARITY; ++idx)
-        printf("%u, ", hams(10, 20, idx));
-    printf("\n");
-
     // Directional Loss
     Tensor<Byte> messyDisparityMap = directionalLoss(hams);
     hams.free();
 
-    return {messyDisparityMap};
+    // Median Blurring
+    Tensor<Byte> disparityMap = rankFilter(messyDisparityMap, RankOperation::Median);
+    messyDisparityMap.free();
+
+    // Dilation & Erosion Loop
+    if(MORPH_ITERATIONS > 0) {
+        for(size_t idx = 0; idx < MORPH_ITERATIONS; ++idx) {
+            Tensor<Byte> nextDisparityMap = rankFilter(disparityMap, RankOperation::Maximum);
+            disparityMap.free();
+            disparityMap = nextDisparityMap;
+        }
+
+        for(size_t idx = 0; idx < MORPH_ITERATIONS; ++idx) {
+            Tensor<Byte> nextDisparityMap = rankFilter(disparityMap, RankOperation::Minimum);
+            disparityMap.free();
+            disparityMap = nextDisparityMap;
+        }
+    }
+
+    return Image(disparityMap);
 }

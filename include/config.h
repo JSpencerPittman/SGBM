@@ -3,7 +3,7 @@
 
 // Center-Symmetric Census Transform
 #define BLOCK_SIZE 32
-#define CSCT_RADIUS 3
+#define CSCT_RADIUS 2
 #define CSCT_DIAMETER RADIUS*2 + 1
 
 // Hamming Distances
@@ -12,7 +12,7 @@
 // Directional Loss
 #define P1 7
 #define P2 17
-#define NUM_DIRECTIONS 8
+#define NUM_DIRECTIONS 5
 
 // Median Blur
 #define MEDIAN_RADIUS 2

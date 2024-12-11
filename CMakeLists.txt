@@ -17,7 +17,7 @@ find_package(OpenCV REQUIRED)
 SET(SOURCE_CXX_FILES src/main.cpp src/image.cpp)
 SET(SOURCE_CUDA_FILES src/csct.cu src/hamming.cu src/directional.cu src/rank_filt.cu src/sgbm.cu)
 SET(SOURCE_CXX_FILES_SERIAL src/serial/main.cpp src/serial/csct.cpp src/serial/sgbm.cpp src/serial/image.cpp
-        src/serial/hamming.cpp src/serial/directional.cpp)
+        src/serial/hamming.cpp src/serial/directional.cpp src/serial/rank_filt.cpp)
 
 add_executable(${PROJECT_NAME} ${SOURCE_CXX_FILES} ${SOURCE_CUDA_FILES})
 add_executable(OPENCV_BM benchmark/opencv_bench.cpp)
