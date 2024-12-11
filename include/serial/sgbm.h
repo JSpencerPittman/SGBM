@@ -7,7 +7,8 @@
 
 Tensor<bool> csct(Image &image);
 Tensor<uint32_t> hamming(Tensor<bool>& leftCSCT, Tensor<bool>& rightCSCT);
+Tensor<Byte> directionalLoss(Tensor<uint32_t>& distancesHost);
 
-void sgbm(Image& leftImage, Image& rightImage);
+Image sgbm(Image& leftImage, Image& rightImage);
 
 #endif

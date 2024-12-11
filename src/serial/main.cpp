@@ -26,13 +26,12 @@ int main(int argc, char* argv[])
 
     auto start = std::chrono::system_clock::now();
 
-    // Image blurDispMap = sgbm(leftImage, rightImage);
-    sgbm(leftImage, rightImage);
+    Image blurDispMap = sgbm(leftImage, rightImage);
 
     auto end = std::chrono::system_clock::now();
     auto duration = std::chrono::duration<double>(end - start);
 
-    // blurDispMap.writePng(outputPath);
+    blurDispMap.writePng(outputPath);
 
     printf("Duration: %lf\n", duration.count());
 

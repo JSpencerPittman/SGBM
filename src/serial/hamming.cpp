@@ -23,6 +23,21 @@ void hamming(Tensor<bool>& leftCSCT, Tensor<bool>& rightCSCT, Tensor<uint32_t>& 
             TensorCoord coordLeftImage(coordCrop.row, coordCrop.col + MAX_DISPARITY);
             for(size_t disparity = 0; disparity <= MAX_DISPARITY; ++disparity) {
                 TensorCoord coordRightImage(coordLeftImage.row, coordLeftImage.col - disparity);
+                if(row == 20 && col == 20 && disparity == 0) {
+                    printf("HAMMING TIME\n");
+                    uint32_t dists = calcDistance(leftCSCT.colPtr(coordLeftImage),
+                                rightCSCT.colPtr(coordRightImage),
+                                compPerPixel);
+                    printf("Distance: %u\nLeft: ", dists);
+                    for(size_t idx = 0; idx < compPerPixel; ++idx) {
+                        printf("%d, ", leftCSCT.colPtr(coordLeftImage)[idx]);
+                    }
+                    printf("\nRight: ");
+                    for(size_t idx = 0; idx < compPerPixel; ++idx) {
+                        printf("%d, ", rightCSCT.colPtr(coordRightImage)[idx]);
+                    }
+                    printf("\n");
+                }
                 distances(coordCrop.row, coordCrop.col, disparity) = 
                     calcDistance(leftCSCT.colPtr(coordLeftImage),
                                 rightCSCT.colPtr(coordRightImage),
